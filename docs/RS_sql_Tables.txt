@@ -1,0 +1,222 @@
+-- Banco de Dados Projetos_RS - Estrutura traduzida para PT-BR
+-- Certifique-se de habilitar a extensao pgcrypto para usar gen_random_uuid().
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE clientes (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome text NOT NULL,
+    documento text UNIQUE,
+    criado_em timestamptz DEFAULT now()
+);
+
+CREATE TABLE contratos_cliente (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    cliente_id uuid REFERENCES clientes(id),
+    numero_contrato text NOT NULL,
+    data_inicio date NOT NULL,
+    data_fim date NOT NULL,
+    valor_total numeric(14,2) NOT NULL,
+    valor_comprometido numeric(14,2),
+    valor_disponivel numeric(14,2),
+    status text
+);
+CREATE INDEX IF NOT EXISTS contratos_cliente_cliente_id_idx
+    ON contratos_cliente(cliente_id);
+
+CREATE TABLE especificacoes_servico (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    contrato_id uuid REFERENCES contratos_cliente(id),
+    numero_especificacao text NOT NULL,
+    titulo text,
+    descricao text,
+    valor_total numeric(14,2) NOT NULL,
+    valor_comprometido numeric(14,2),
+    valor_disponivel numeric(14,2)
+);
+CREATE INDEX IF NOT EXISTS especificacoes_servico_contrato_id_idx
+    ON especificacoes_servico(contrato_id);
+
+CREATE TABLE solicitacoes_servico (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    especificacao_id uuid REFERENCES especificacoes_servico(id),
+    codigo_rs text NOT NULL,
+    titulo text NOT NULL,
+    escopo text,
+    complexidade text,
+    inicio_planejado timestamptz,
+    fim_planejado timestamptz,
+    inicio_real timestamptz,
+    fim_real timestamptz,
+    percentual_conclusao numeric(5,2),
+    responsavel_cliente text,
+    responsavel_bu text,
+    justificativa text,
+    notas_aceite text,
+    status text
+);
+CREATE UNIQUE INDEX IF NOT EXISTS solicitacoes_servico_codigo_rs_key
+    ON solicitacoes_servico(codigo_rs);
+CREATE INDEX IF NOT EXISTS solicitacoes_servico_especificacao_id_idx
+    ON solicitacoes_servico(especificacao_id);
+
+CREATE TABLE fornecedores (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome text NOT NULL,
+    documento text UNIQUE,
+    email_contato text
+);
+
+CREATE TABLE contratos_fornecedor (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    fornecedor_id uuid REFERENCES fornecedores(id),
+    numero_contrato text NOT NULL,
+    data_inicio date,
+    data_fim date,
+    valor_total numeric(14,2),
+    valor_comprometido numeric(14,2),
+    valor_disponivel numeric(14,2)
+);
+CREATE INDEX IF NOT EXISTS contratos_fornecedor_fornecedor_id_idx
+    ON contratos_fornecedor(fornecedor_id);
+
+CREATE TABLE perfis_recursos (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome text NOT NULL,
+    descricao text,
+    valor_hora numeric(10,2) NOT NULL
+);
+
+CREATE TABLE recursos_fornecedor (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    fornecedor_id uuid REFERENCES fornecedores(id),
+    perfil_id uuid REFERENCES perfis_recursos(id),
+    nome_completo text NOT NULL,
+    email text,
+    ativo boolean DEFAULT true
+);
+CREATE INDEX IF NOT EXISTS recursos_fornecedor_fornecedor_id_idx
+    ON recursos_fornecedor(fornecedor_id);
+CREATE INDEX IF NOT EXISTS recursos_fornecedor_perfil_id_idx
+    ON recursos_fornecedor(perfil_id);
+
+CREATE TABLE ordens_servico (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    contrato_fornecedor_id uuid REFERENCES contratos_fornecedor(id),
+    numero_os text NOT NULL,
+    aberta_em timestamptz,
+    perfil_solicitado_id uuid REFERENCES perfis_recursos(id),
+    quantidade_solicitada integer,
+    horas_solicitadas numeric(10,2),
+    valor_unitario numeric(14,2),
+    valor_reservado numeric(14,2),
+    valor_consumido numeric(14,2),
+    valor_disponivel numeric(14,2)
+);
+CREATE INDEX IF NOT EXISTS ordens_servico_contrato_fornecedor_id_idx
+    ON ordens_servico(contrato_fornecedor_id);
+CREATE INDEX IF NOT EXISTS ordens_servico_perfil_solicitado_id_idx
+    ON ordens_servico(perfil_solicitado_id);
+
+CREATE TABLE metricas_solicitacao (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    solicitacao_id uuid REFERENCES solicitacoes_servico(id),
+    tipo_metrica text,
+    quantidade numeric(10,2) NOT NULL,
+    horas_unidade numeric(10,2),
+    taxa numeric(14,2),
+    valor_total numeric(14,2)
+);
+CREATE INDEX IF NOT EXISTS metricas_solicitacao_solicitacao_id_idx
+    ON metricas_solicitacao(solicitacao_id);
+
+CREATE TABLE alocacoes_recursos (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    solicitacao_id uuid REFERENCES solicitacoes_servico(id),
+    recurso_fornecedor_id uuid REFERENCES recursos_fornecedor(id),
+    ordem_servico_id uuid REFERENCES ordens_servico(id),
+    papel text,
+    inicio_alocacao timestamptz,
+    fim_alocacao timestamptz
+);
+CREATE INDEX IF NOT EXISTS alocacoes_recursos_solicitacao_id_idx
+    ON alocacoes_recursos(solicitacao_id);
+CREATE INDEX IF NOT EXISTS alocacoes_recursos_recurso_fornecedor_id_idx
+    ON alocacoes_recursos(recurso_fornecedor_id);
+CREATE INDEX IF NOT EXISTS alocacoes_recursos_ordem_servico_id_idx
+    ON alocacoes_recursos(ordem_servico_id);
+
+CREATE TABLE apontamentos_tempo (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    alocacao_id uuid REFERENCES alocacoes_recursos(id),
+    data_trabalho date NOT NULL,
+    horas numeric(10,2) NOT NULL,
+    aprovado boolean,
+    mes_faturamento text
+);
+CREATE INDEX IF NOT EXISTS apontamentos_tempo_alocacao_id_idx
+    ON apontamentos_tempo(alocacao_id);
+
+CREATE TABLE projetos (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    solicitacao_id uuid REFERENCES solicitacoes_servico(id),
+    titulo text NOT NULL,
+    descricao text,
+    inicio_planejado timestamptz,
+    fim_planejado timestamptz,
+    inicio_real timestamptz,
+    fim_real timestamptz,
+    percentual_conclusao numeric(5,2)
+);
+CREATE INDEX IF NOT EXISTS projetos_solicitacao_id_idx
+    ON projetos(solicitacao_id);
+
+CREATE TABLE evidencias_projeto (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    solicitacao_id uuid REFERENCES solicitacoes_servico(id),
+    titulo text NOT NULL,
+    descricao text,
+    caminho_armazenamento text,
+    criado_em timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS evidencias_projeto_solicitacao_id_idx
+    ON evidencias_projeto(solicitacao_id);
+
+CREATE TABLE criterios_aceite (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    solicitacao_id uuid REFERENCES solicitacoes_servico(id),
+    descricao text NOT NULL,
+    evidencia_esperada text,
+    status text,
+    aprovado_em timestamptz
+);
+CREATE INDEX IF NOT EXISTS criterios_aceite_solicitacao_id_idx
+    ON criterios_aceite(solicitacao_id);
+
+CREATE OR REPLACE VIEW v_project_financials AS
+WITH orcamento AS (
+    SELECT
+        solicitacao_id,
+        SUM(valor_total) AS orcamento_solicitacao
+    FROM metricas_solicitacao
+    GROUP BY solicitacao_id
+), horas AS (
+    SELECT
+        ar.solicitacao_id,
+        SUM(at.horas) AS total_horas,
+        SUM(at.horas * COALESCE(pr.valor_hora, 0)) AS custo_fornecedor
+    FROM alocacoes_recursos ar
+    LEFT JOIN apontamentos_tempo at ON at.alocacao_id = ar.id
+    LEFT JOIN recursos_fornecedor rf ON rf.id = ar.recurso_fornecedor_id
+    LEFT JOIN perfis_recursos pr ON pr.id = rf.perfil_id
+    GROUP BY ar.solicitacao_id
+)
+SELECT
+    ss.id AS solicitacao_id,
+    ss.codigo_rs,
+    COALESCE(o.orcamento_solicitacao, 0)::numeric(14,2) AS orcamento_solicitacao,
+    COALESCE(h.custo_fornecedor, 0)::numeric(14,2) AS custo_fornecedor,
+    COALESCE(h.total_horas, 0)::numeric(14,2) AS total_horas
+FROM solicitacoes_servico ss
+LEFT JOIN orcamento o ON o.solicitacao_id = ss.id
+LEFT JOIN horas h ON h.solicitacao_id = ss.id;

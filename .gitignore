@@ -11,3 +11,7 @@ coverage/
 *.lock
 !.pnpm-lock.yaml
 !.yarn.lock
+
+# Generated diagram artifacts
+docs/projetos_rs_er_diagram.png
+docs/projetos_rs_er_diagram.data-uri
