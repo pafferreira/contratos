@@ -127,10 +127,10 @@ create table if not exists public."C_APONTAMENTOS_TEMPO" (
   data_trabalho date not null,
   horas numeric(6,2) not null,
   aprovado boolean default false,
-  mes_faturamento date generated always as (date_trunc('month', data_trabalho)) stored
+  mes_faturamento date
 );
 
-create view if not exists public."C_V_PROJETOS_FINANCEIROS" as
+create or replace view public."C_V_PROJETOS_FINANCEIROS" as
 select
   sr.id as solicitacao_id,
   sr.codigo_rs,
@@ -144,3 +144,17 @@ left join public."C_RECURSOS_FORNECEDOR" sres on sres.id = ra.recurso_fornecedor
 left join public."C_PERFIS_RECURSOS" rp on rp.id = sres.perfil_id
 left join public."C_APONTAMENTOS_TEMPO" te on te.alocacao_id = ra.id
 group by sr.id, sr.codigo_rs;
+
+CREATE OR REPLACE FUNCTION public.set_mes_faturamento()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
+    NEW.mes_faturamento := date_trunc('month', NEW.data_trabalho)::date;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_set_mes_faturamento
+BEFORE INSERT OR UPDATE ON public."C_APONTAMENTOS_TEMPO"
+FOR EACH ROW EXECUTE FUNCTION public.set_mes_faturamento();
