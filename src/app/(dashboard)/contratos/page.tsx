@@ -5,7 +5,7 @@ import type { ChangeEvent, FormEvent } from "react";
 import { format, parseISO } from "date-fns";
 import clsx from "clsx";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Pencil, Plus, RefreshCcw, Trash2, X } from "lucide-react";
+import { CalendarDays, Pencil, Plus, RefreshCcw, Trash2, X } from "lucide-react";
 import { z } from "zod";
 
 import { PageHeader } from "@/components/common/page-header";
@@ -14,21 +14,22 @@ import { Card } from "@/components/ui/card";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { type Database, type TablesRow } from "@/lib/supabase/types";
 
-type ContractRow = TablesRow<Database["public"]["Tables"]["P_client_contracts"]>;
-type ClientRow = TablesRow<Database["public"]["Tables"]["P_clients"]>;
+type ContractRow = TablesRow<Database["public"]["Tables"]["C_CONTRATOS_CLIENTE"]>;
+type ClientRow = TablesRow<Database["public"]["Tables"]["C_CLIENTES"]>;
 
 type ContractRecord = ContractRow & {
-  client?: Pick<ClientRow, "id" | "name"> | null;
+  cliente?: Pick<ClientRow, "id" | "nome"> | null;
 };
 
 type ContractFormState = {
-  contract_number: string;
-  client_id: string;
-  start_date: string;
-  end_date: string;
-  total_value: string;
-  committed_value: string;
-  remaining_value: string;
+  cliente_id: string;
+  numero_contrato: string;
+  data_inicio: string;
+  data_fim: string;
+  valor_total: string;
+  valor_total_display: string;
+  valor_comprometido: string;
+  valor_comprometido_display: string;
   status: string;
 };
 
@@ -36,12 +37,24 @@ type FormErrors = Partial<Record<keyof ContractFormState, string>> & {
   general?: string;
 };
 
-const CONTRACT_STATUS = [
-  { value: "vigente", label: "Vigente" },
-  { value: "em_homologacao", label: "Em homologação" },
-  { value: "encerrado", label: "Encerrado" },
-  { value: "suspenso", label: "Suspenso" }
+const CONTRACTS_TABLE =
+  (process.env.NEXT_PUBLIC_SUPABASE_CONTRACTS_TABLE ??
+    "C_CONTRATOS_CLIENTE") as keyof Database["public"]["Tables"];
+const CLIENTS_TABLE =
+  (process.env.NEXT_PUBLIC_SUPABASE_CLIENTS_TABLE ??
+    "C_CLIENTES") as keyof Database["public"]["Tables"];
+
+const STATUS_OPTIONS = [
+  { value: "rascunho", label: "Rascunho" },
+  { value: "ativo", label: "Ativo" },
+  { value: "encerrado", label: "Encerrado" }
 ] as const;
+
+const statusStyles: Record<string, string> = {
+  rascunho: "bg-neutral-100 text-neutral-600",
+  ativo: "bg-success/10 text-success",
+  encerrado: "bg-neutral-200 text-neutral-700"
+};
 
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -49,87 +62,98 @@ const currencyFormatter = new Intl.NumberFormat("pt-BR", {
 });
 
 const EMPTY_FORM_STATE: ContractFormState = {
-  contract_number: "",
-  client_id: "",
-  start_date: "",
-  end_date: "",
-  total_value: "",
-  committed_value: "",
-  remaining_value: "",
-  status: "vigente"
+  cliente_id: "",
+  numero_contrato: "",
+  data_inicio: "",
+  data_fim: "",
+  valor_total: "",
+  valor_total_display: "",
+  valor_comprometido: "",
+  valor_comprometido_display: "",
+  status: "rascunho"
 };
 
 const ContractFormSchema = z
   .object({
-    contract_number: z.string().trim().min(1, "Informe o número do contrato"),
-    client_id: z.string().trim().min(1, "Selecione um cliente"),
-    start_date: z.string().trim().min(1, "Informe a data inicial"),
-    end_date: z.string().trim().min(1, "Informe a data final"),
-    total_value: z
+    cliente_id: z.string().trim().min(1, "Selecione o cliente"),
+    numero_contrato: z.string().trim().min(1, "Informe o número do contrato"),
+    data_inicio: z.string().trim().min(1, "Informe a data inicial"),
+    data_fim: z.string().trim().min(1, "Informe a data final"),
+    valor_total: z
       .string()
       .trim()
       .min(1, "Informe o valor total")
-      .transform((value) => Number(value))
+      .transform(Number)
       .refine((value) => !Number.isNaN(value), "Valor total inválido")
       .refine((value) => value > 0, "O valor total deve ser maior que zero"),
-    committed_value: z
+    valor_comprometido: z
       .string()
       .trim()
       .transform((value) => (value === "" ? 0 : Number(value)))
       .refine((value) => !Number.isNaN(value), "Valor comprometido inválido")
       .refine((value) => value >= 0, "O valor comprometido não pode ser negativo"),
-    remaining_value: z
-      .string()
-      .trim()
-      .transform((value) => (value === "" ? 0 : Number(value)))
-      .refine((value) => !Number.isNaN(value), "Saldo inválido")
-      .refine((value) => value >= 0, "O saldo não pode ser negativo"),
     status: z.string().trim().min(1, "Selecione um status")
   })
   .refine(
     (data) => {
-      const start = new Date(data.start_date);
-      const end = new Date(data.end_date);
+      const start = new Date(data.data_inicio);
+      const end = new Date(data.data_fim);
       return !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && end >= start;
     },
     {
       message: "A data final deve ser posterior ou igual à data inicial",
-      path: ["end_date"]
+      path: ["data_fim"]
     }
   )
   .refine(
-    (data) => data.remaining_value <= data.total_value,
+    (data) => data.valor_comprometido <= data.valor_total,
     {
-      message: "O saldo não pode ser maior que o valor total",
-      path: ["remaining_value"]
+      message: "O valor comprometido não pode ser maior que o total",
+      path: ["valor_comprometido"]
     }
   );
-
-const statusStyles: Record<string, string> = {
-  vigente: "bg-success/10 text-success",
-  em_homologacao: "bg-warning/10 text-warning",
-  encerrado: "bg-neutral-100 text-neutral-700",
-  suspenso: "bg-danger/10 text-danger"
-};
-
-function formatDateRange(start?: string | null, end?: string | null) {
-  if (!start || !end) {
-    return "Período não informado";
-  }
-  try {
-    const startLabel = format(parseISO(start), "dd/MM/yyyy");
-    const endLabel = format(parseISO(end), "dd/MM/yyyy");
-    return `${startLabel} – ${endLabel}`;
-  } catch {
-    return `${start} – ${end}`;
-  }
-}
 
 function formatCurrency(value?: number | null) {
   if (typeof value !== "number") {
     return "—";
   }
   return currencyFormatter.format(value);
+}
+
+function formatDateRange(start?: string | null, end?: string | null) {
+  if (!start || !end) return "Período não informado";
+  try {
+    return `${format(parseISO(start), "dd/MM/yyyy")} – ${format(parseISO(end), "dd/MM/yyyy")}`;
+  } catch {
+    return `${start} – ${end}`;
+  }
+}
+
+function inputClassName(hasError?: boolean) {
+  return clsx(
+    "w-full rounded-lg border px-3 py-2 text-sm text-neutral-900 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-200 focus-visible:ring-offset-1",
+    hasError
+      ? "border-danger bg-white"
+      : "border-neutral-300 bg-neutral-50 hocus:border-brand-500 hocus:bg-white"
+  );
+}
+
+function formatCurrencyDisplayFromNumber(value?: number | null) {
+  return typeof value === "number"
+    ? currencyFormatter.format(value).replace(/\u00A0/g, " ")
+    : "";
+}
+
+function normalizeCurrencyInput(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) {
+    return { raw: "", display: "" };
+  }
+  const numeric = (Number(digits) / 100).toFixed(2);
+  const display = currencyFormatter
+    .format(Number(numeric))
+    .replace(/\u00A0/g, " ");
+  return { raw: numeric, display };
 }
 
 export default function ContratosPage() {
@@ -142,9 +166,7 @@ export default function ContratosPage() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
-  const [formState, setFormState] = useState<ContractFormState>(() => ({
-    ...EMPTY_FORM_STATE
-  }));
+  const [formState, setFormState] = useState<ContractFormState>({ ...EMPTY_FORM_STATE });
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [activeContractId, setActiveContractId] = useState<string | null>(null);
@@ -153,6 +175,16 @@ export default function ContratosPage() {
   const [pendingContract, setPendingContract] = useState<ContractRecord | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const clientsMap = useMemo(() => {
+    const map = new Map<string, ClientRow>();
+    clients.forEach((client) => {
+      if (client.id) {
+        map.set(client.id, client);
+      }
+    });
+    return map;
+  }, [clients]);
 
   const loadContracts = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -167,11 +199,7 @@ export default function ContratosPage() {
         return;
       }
 
-      if (options?.silent) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+      options?.silent ? setRefreshing(true) : setLoading(true);
       setError(null);
 
       const [
@@ -179,26 +207,30 @@ export default function ContratosPage() {
         { data: clientData, error: clientError }
       ] = await Promise.all([
         supabase
-          .from("P_client_contracts")
+          .from(CONTRACTS_TABLE)
           .select(
-            "id, client_id, contract_number, start_date, end_date, total_value, committed_value, remaining_value, status, client:P_clients (id, name)"
+            "id, cliente_id, numero_contrato, data_inicio, data_fim, valor_total, valor_comprometido, valor_disponivel, status, cliente:C_CLIENTES (id, nome)"
           )
-          .order("start_date", { ascending: false }),
-        supabase.from("P_clients").select("id, name").order("name")
+          .order("data_inicio", { ascending: false }),
+        supabase.from(CLIENTS_TABLE).select("id, nome").order("nome")
       ]);
 
       if (contractError || clientError) {
-        setError("Não foi possível carregar os contratos. Tente novamente.");
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.error("Erro ao carregar contratos/clientes:", contractError, clientError);
+        }
+        setError(
+          contractError?.message ??
+            clientError?.message ??
+            "Não foi possível carregar os contratos. Verifique se os nomes das tabelas coincidem com o Supabase."
+        );
       } else {
         setContracts((contractData ?? []) as ContractRecord[]);
         setClients(clientData ?? []);
       }
 
-      if (options?.silent) {
-        setRefreshing(false);
-      } else {
-        setLoading(false);
-      }
+      options?.silent ? setRefreshing(false) : setLoading(false);
     },
     [supabase]
   );
@@ -234,30 +266,55 @@ export default function ContratosPage() {
     setFormMode("edit");
     setActiveContractId(contract.id);
     setFormState({
-      contract_number: contract.contract_number ?? "",
-      client_id: contract.client?.id ?? contract.client_id ?? "",
-      start_date: contract.start_date ?? "",
-      end_date: contract.end_date ?? "",
-      total_value:
-        contract.total_value !== null && contract.total_value !== undefined
-          ? String(contract.total_value)
+      cliente_id: contract.cliente_id ?? "",
+      numero_contrato: contract.numero_contrato ?? "",
+      data_inicio: contract.data_inicio ?? "",
+      data_fim: contract.data_fim ?? "",
+      valor_total:
+        typeof contract.valor_total === "number" ? contract.valor_total.toFixed(2) : "",
+      valor_total_display: formatCurrencyDisplayFromNumber(contract.valor_total),
+      valor_comprometido:
+        typeof contract.valor_comprometido === "number"
+          ? contract.valor_comprometido.toFixed(2)
           : "",
-      committed_value:
-        contract.committed_value !== null && contract.committed_value !== undefined
-          ? String(contract.committed_value)
-          : "",
-      remaining_value:
-        contract.remaining_value !== null && contract.remaining_value !== undefined
-          ? String(contract.remaining_value)
-          : "",
-      status: contract.status ?? "vigente"
+      valor_comprometido_display: formatCurrencyDisplayFromNumber(
+        contract.valor_comprometido
+      ),
+      status: contract.status ?? "rascunho"
     });
     setFormErrors({});
     setFormOpen(true);
   };
 
-  const handleFormChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleCurrencyInputChange = (
+    field: "valor_total" | "valor_comprometido",
+    displayValue: string
+  ) => {
+    const { raw, display } = normalizeCurrencyInput(displayValue);
+    setFormState((prev) => {
+      if (field === "valor_total") {
+        return {
+          ...prev,
+          valor_total: raw,
+          valor_total_display: display
+        };
+      }
+      return {
+        ...prev,
+        valor_comprometido: raw,
+        valor_comprometido_display: display
+      };
+    });
+  };
+
+  const handleFormChange = (
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = event.target;
+    if (name === "valor_total" || name === "valor_comprometido") {
+      handleCurrencyInputChange(name, value);
+      return;
+    }
     setFormState((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -278,33 +335,37 @@ export default function ContratosPage() {
       const formattedErrors: FormErrors = {};
       (Object.keys(fieldErrors) as (keyof ContractFormState)[]).forEach((field) => {
         const fieldError = fieldErrors[field];
-        if (fieldError && fieldError.length > 0) {
-          formattedErrors[field] = fieldError[0] ?? "";
+        if (fieldError?.length) {
+          formattedErrors[field] = fieldError[0];
         }
       });
       setFormErrors(formattedErrors);
       return;
     }
 
-    setSubmitting(true);
+    if (!clientsMap.has(parsed.data.cliente_id)) {
+      setFormErrors({
+        cliente_id: "Cliente inválido. Recarregue a página para sincronizar a lista."
+      });
+      return;
+    }
 
-    const payload = parsed.data;
+    setSubmitting(true);
     const supabasePayload = {
-      contract_number: payload.contract_number,
-      client_id: payload.client_id,
-      start_date: payload.start_date,
-      end_date: payload.end_date,
-      total_value: payload.total_value,
-      committed_value: payload.committed_value,
-      remaining_value: payload.remaining_value,
-      status: payload.status
+      cliente_id: parsed.data.cliente_id,
+      numero_contrato: parsed.data.numero_contrato,
+      data_inicio: parsed.data.data_inicio,
+      data_fim: parsed.data.data_fim,
+      valor_total: parsed.data.valor_total,
+      valor_comprometido: parsed.data.valor_comprometido,
+      status: parsed.data.status
     };
 
     const mutation =
       formMode === "create"
-        ? supabase.from("P_client_contracts").insert(supabasePayload)
+        ? supabase.from(CONTRACTS_TABLE).insert(supabasePayload)
         : supabase
-            .from("P_client_contracts")
+            .from(CONTRACTS_TABLE)
             .update(supabasePayload)
             .eq("id", activeContractId ?? "");
 
@@ -312,7 +373,7 @@ export default function ContratosPage() {
 
     if (mutationError) {
       setFormErrors({
-        general: "Não foi possível salvar o contrato. Tente novamente."
+        general: mutationError.message ?? "Não foi possível salvar o contrato."
       });
       setSubmitting(false);
       return;
@@ -343,7 +404,6 @@ export default function ContratosPage() {
 
   const handleDelete = async () => {
     if (!pendingContract) return;
-
     if (!supabase) {
       setDeleteError("Supabase não configurado. Atualize as variáveis de ambiente.");
       return;
@@ -351,12 +411,12 @@ export default function ContratosPage() {
 
     setDeleteLoading(true);
     const { error: deleteErr } = await supabase
-      .from("P_client_contracts")
+      .from(CONTRACTS_TABLE)
       .delete()
       .eq("id", pendingContract.id);
 
     if (deleteErr) {
-      setDeleteError("Não foi possível excluir o contrato. Tente novamente.");
+      setDeleteError(deleteErr.message ?? "Não foi possível excluir o contrato.");
       setDeleteLoading(false);
       return;
     }
@@ -372,19 +432,21 @@ export default function ContratosPage() {
     void loadContracts({ silent: true });
   };
 
+  const supabaseUnavailable = supabase === null;
+  const clientSelectDisabled = clients.length === 0;
+  const isCreateMode = formMode === "create";
+  const submitDisabled = submitting || (clientSelectDisabled && isCreateMode);
+
   const getStatusLabel = (value?: string | null) => {
     if (!value) return "Sem status";
-    const found = CONTRACT_STATUS.find((status) => status.value === value);
-    return found ? found.label : value;
+    return STATUS_OPTIONS.find((item) => item.value === value)?.label ?? value;
   };
-
-  const supabaseUnavailable = supabase === null;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Contratos do Cliente"
-        subtitle="Cadastre, consulte, edite e exclua contratos com saldos atualizados."
+        subtitle="Inventário oficial de contratos. Os nomes seguem a convenção do Supabase."
         actions={
           <>
             <Button
@@ -425,92 +487,182 @@ export default function ContratosPage() {
             </Button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-neutral-100 text-sm">
-              <thead>
-                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  <th className="px-3 py-3">Contrato</th>
-                  <th className="px-3 py-3">Cliente</th>
-                  <th className="px-3 py-3">Período</th>
-                  <th className="px-3 py-3">Valor total</th>
-                  <th className="px-3 py-3">Saldo</th>
-                  <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100 text-neutral-700">
-                {contracts.map((contract) => (
-                  <tr key={contract.id}>
-                    <td className="px-3 py-4">
-                      <div className="font-semibold text-neutral-900">
-                        {contract.contract_number}
-                      </div>
+          <div className="space-y-4">
+            <div className="space-y-4 md:hidden">
+              {contracts.map((contract) => (
+                <Card key={`${contract.id}-card`} className="space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-neutral-500">Contrato</p>
+                      <h3 className="text-lg font-semibold text-neutral-900">
+                        {contract.numero_contrato}
+                      </h3>
                       <p className="text-xs text-neutral-500">{contract.id}</p>
-                    </td>
-                    <td className="px-3 py-4">
-                      {contract.client?.name ?? "Cliente não informado"}
-                    </td>
-                    <td className="px-3 py-4">
-                      {formatDateRange(contract.start_date, contract.end_date)}
-                    </td>
-                    <td className="px-3 py-4">
-                      <div className="font-medium text-neutral-900">
-                        {formatCurrency(contract.total_value)}
-                      </div>
-                      <p className="text-xs text-neutral-500">
-                        Comprometido: {formatCurrency(contract.committed_value)}
-                      </p>
-                    </td>
-                    <td className="px-3 py-4 font-medium text-success">
-                      {formatCurrency(contract.remaining_value)}
-                    </td>
-                    <td className="px-3 py-4">
-                      <span
-                        className={clsx(
-                          "inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize",
-                          statusStyles[contract.status ?? ""] ?? "bg-neutral-100 text-neutral-600"
-                        )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEditForm(contract)}
+                        aria-label={`Editar contrato ${contract.numero_contrato}`}
+                        title="Editar contrato"
+                        disabled={supabaseUnavailable}
                       >
-                        {getStatusLabel(contract.status)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditForm(contract)}
-                          aria-label={`Editar contrato ${contract.contract_number}`}
-                          disabled={supabaseUnavailable}
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-danger"
+                        onClick={() => openDeleteDialog(contract)}
+                        aria-label={`Excluir contrato ${contract.numero_contrato}`}
+                        title="Excluir contrato"
+                        disabled={supabaseUnavailable}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <dl className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <dt className="text-neutral-500">Cliente</dt>
+                      <dd className="font-medium text-neutral-900">
+                        {contract.cliente?.nome ??
+                          clientsMap.get(contract.cliente_id ?? "")?.nome ??
+                          "Cliente não encontrado"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-neutral-500">Período</dt>
+                      <dd className="font-medium text-neutral-900">
+                        {formatDateRange(contract.data_inicio, contract.data_fim)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-neutral-500">Valor total</dt>
+                      <dd className="font-medium text-neutral-900">
+                        {formatCurrency(contract.valor_total)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-neutral-500">Comprometido</dt>
+                      <dd className="font-medium text-neutral-900">
+                        {formatCurrency(contract.valor_comprometido)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-neutral-500">Saldo disponível</dt>
+                      <dd className="font-semibold text-success">
+                        {formatCurrency(contract.valor_disponivel)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-neutral-500">Status</dt>
+                      <dd>
+                        <span
+                          className={clsx(
+                            "inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize",
+                            statusStyles[contract.status ?? ""] ??
+                              "bg-neutral-100 text-neutral-600"
+                          )}
                         >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Editar
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-danger"
-                          onClick={() => openDeleteDialog(contract)}
-                          aria-label={`Excluir contrato ${contract.contract_number}`}
-                          disabled={supabaseUnavailable}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir
-                        </Button>
-                      </div>
-                    </td>
+                          {getStatusLabel(contract.status)}
+                        </span>
+                      </dd>
+                    </div>
+                  </dl>
+                </Card>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="min-w-full divide-y divide-neutral-100 text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                    <th className="px-3 py-3">Contrato</th>
+                    <th className="px-3 py-3">Cliente</th>
+                    <th className="px-3 py-3">Período</th>
+                    <th className="px-3 py-3">Valor total</th>
+                    <th className="px-3 py-3">Comprometido</th>
+                    <th className="px-3 py-3">Saldo disponível</th>
+                    <th className="px-3 py-3">Status</th>
+                    <th className="px-3 py-3 text-right">Ações</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 text-neutral-700">
+                  {contracts.map((contract) => (
+                    <tr key={contract.id}>
+                      <td className="px-3 py-4">
+                        <div className="font-semibold text-neutral-900">
+                          {contract.numero_contrato}
+                        </div>
+                        <p className="text-xs text-neutral-500">{contract.id}</p>
+                      </td>
+                      <td className="px-3 py-4">
+                        {contract.cliente?.nome ??
+                          clientsMap.get(contract.cliente_id ?? "")?.nome ??
+                          "Cliente não encontrado"}
+                      </td>
+                      <td className="px-3 py-4">
+                        {formatDateRange(contract.data_inicio, contract.data_fim)}
+                      </td>
+                      <td className="px-3 py-4 font-medium text-neutral-900">
+                        {formatCurrency(contract.valor_total)}
+                      </td>
+                      <td className="px-3 py-4 text-neutral-800">
+                        {formatCurrency(contract.valor_comprometido)}
+                      </td>
+                      <td className="px-3 py-4 font-semibold text-success">
+                        {formatCurrency(contract.valor_disponivel)}
+                      </td>
+                      <td className="px-3 py-4">
+                        <span
+                          className={clsx(
+                            "inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize",
+                            statusStyles[contract.status ?? ""] ?? "bg-neutral-100 text-neutral-600"
+                          )}
+                        >
+                          {getStatusLabel(contract.status)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-4 text-right">
+                        <div className="flex flex-col items-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditForm(contract)}
+                            aria-label={`Editar contrato ${contract.numero_contrato}`}
+                            title="Editar contrato"
+                            disabled={supabaseUnavailable}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-danger"
+                            onClick={() => openDeleteDialog(contract)}
+                            aria-label={`Excluir contrato ${contract.numero_contrato}`}
+                            title="Excluir contrato"
+                            disabled={supabaseUnavailable}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </Card>
 
       <Dialog.Root open={formOpen} onOpenChange={handleFormDialogChange}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-neutral-900/40 backdrop-blur-sm" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(520px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-neutral-100 bg-white p-6 shadow-card">
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-neutral-900/60 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(560px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-neutral-100 bg-white p-6 shadow-card">
             <div className="flex items-start justify-between">
               <Dialog.Title className="text-lg font-semibold text-neutral-900">
                 {formMode === "create" ? "Novo contrato" : "Editar contrato"}
@@ -522,7 +674,7 @@ export default function ContratosPage() {
               </Dialog.Close>
             </div>
             <Dialog.Description className="mt-1 text-sm text-neutral-500">
-              Preencha os dados do contrato para manter o inventário atualizado.
+              Os campos utilizam os mesmos nomes do Supabase (ex.: C_CONTRATOS_CLIENTE).
             </Dialog.Description>
 
             <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
@@ -534,179 +686,144 @@ export default function ContratosPage() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
+                  <label htmlFor="cliente_id" className="text-sm font-medium text-neutral-700">
+                    Cliente
+                  </label>
+                  <select
+                    id="cliente_id"
+                    name="cliente_id"
+                    value={formState.cliente_id}
+                    onChange={handleFormChange}
+                    className={inputClassName(Boolean(formErrors.cliente_id))}
+                    disabled={clientSelectDisabled}
+                  >
+                    <option value="">
+                      {clientSelectDisabled ? "Cadastre clientes primeiro" : "Selecione o cliente"}
+                    </option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.nome}
+                      </option>
+                    ))}
+                  </select>
+                  {formErrors.cliente_id ? (
+                    <p className="text-xs text-danger">{formErrors.cliente_id}</p>
+                  ) : (
+                    <p className="text-xs text-neutral-500">
+                      Fonte: tabela C_CLIENTES do Supabase Inventário.
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
                   <label
-                    htmlFor="contract_number"
+                    htmlFor="numero_contrato"
                     className="text-sm font-medium text-neutral-700"
                   >
                     Número do contrato
                   </label>
                   <input
-                    id="contract_number"
-                    name="contract_number"
-                    value={formState.contract_number}
+                    id="numero_contrato"
+                    name="numero_contrato"
+                    value={formState.numero_contrato}
                     onChange={handleFormChange}
-                    className={clsx(
-                      "w-full rounded-lg border px-3 py-2 text-sm outline-none hocus:border-brand-500",
-                      formErrors.contract_number ? "border-danger" : "border-neutral-200"
-                    )}
+                    className={inputClassName(Boolean(formErrors.numero_contrato))}
                     placeholder="CL-2024-001"
                   />
-                  {formErrors.contract_number ? (
-                    <p className="text-xs text-danger">{formErrors.contract_number}</p>
+                  {formErrors.numero_contrato ? (
+                    <p className="text-xs text-danger">{formErrors.numero_contrato}</p>
                   ) : (
                     <p className="text-xs text-neutral-500">
-                      Use um identificador único definido com o cliente.
+                      Campo equivalente a "numero_contrato" em C_CONTRATOS_CLIENTE.
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label htmlFor="client_id" className="text-sm font-medium text-neutral-700">
-                    Cliente
-                  </label>
-                  <select
-                    id="client_id"
-                    name="client_id"
-                    value={formState.client_id}
-                    onChange={handleFormChange}
-                    className={clsx(
-                      "w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none hocus:border-brand-500",
-                      formErrors.client_id ? "border-danger" : "border-neutral-200"
-                    )}
-                  >
-                    <option value="">Selecione o cliente</option>
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {client.name}
-                      </option>
-                    ))}
-                  </select>
-                  {formErrors.client_id ? (
-                    <p className="text-xs text-danger">{formErrors.client_id}</p>
-                  ) : (
-                    <p className="text-xs text-neutral-500">
-                      Os clientes são sincronizados automaticamente a partir do cadastro geral.
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="start_date" className="text-sm font-medium text-neutral-700">
+                  <label htmlFor="data_inicio" className="text-sm font-medium text-neutral-700">
                     Início da vigência
                   </label>
-                  <input
-                    id="start_date"
-                    type="date"
-                    name="start_date"
-                    value={formState.start_date}
-                    onChange={handleFormChange}
-                    className={clsx(
-                      "w-full rounded-lg border px-3 py-2 text-sm outline-none hocus:border-brand-500",
-                      formErrors.start_date ? "border-danger" : "border-neutral-200"
-                    )}
-                  />
-                  {formErrors.start_date ? (
-                    <p className="text-xs text-danger">{formErrors.start_date}</p>
+                  <div className="relative">
+                    <input
+                      id="data_inicio"
+                      type="date"
+                      name="data_inicio"
+                      value={formState.data_inicio}
+                      onChange={handleFormChange}
+                      className={clsx(inputClassName(Boolean(formErrors.data_inicio)), "pr-10")}
+                    />
+                    <CalendarDays className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                  </div>
+                  {formErrors.data_inicio ? (
+                    <p className="text-xs text-danger">{formErrors.data_inicio}</p>
                   ) : null}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label htmlFor="end_date" className="text-sm font-medium text-neutral-700">
+                  <label htmlFor="data_fim" className="text-sm font-medium text-neutral-700">
                     Fim da vigência
                   </label>
-                  <input
-                    id="end_date"
-                    type="date"
-                    name="end_date"
-                    value={formState.end_date}
-                    onChange={handleFormChange}
-                    className={clsx(
-                      "w-full rounded-lg border px-3 py-2 text-sm outline-none hocus:border-brand-500",
-                      formErrors.end_date ? "border-danger" : "border-neutral-200"
-                    )}
-                  />
-                  {formErrors.end_date ? (
-                    <p className="text-xs text-danger">{formErrors.end_date}</p>
+                  <div className="relative">
+                    <input
+                      id="data_fim"
+                      type="date"
+                      name="data_fim"
+                      value={formState.data_fim}
+                      onChange={handleFormChange}
+                      className={clsx(inputClassName(Boolean(formErrors.data_fim)), "pr-10")}
+                    />
+                    <CalendarDays className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                  </div>
+                  {formErrors.data_fim ? (
+                    <p className="text-xs text-danger">{formErrors.data_fim}</p>
                   ) : null}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label htmlFor="total_value" className="text-sm font-medium text-neutral-700">
+                  <label htmlFor="valor_total" className="text-sm font-medium text-neutral-700">
                     Valor total (R$)
                   </label>
                   <input
-                    id="total_value"
-                    type="number"
-                    step="0.01"
-                    name="total_value"
-                    value={formState.total_value}
+                    id="valor_total"
+                    type="text"
+                    inputMode="numeric"
+                    name="valor_total"
+                    value={formState.valor_total_display}
                     onChange={handleFormChange}
-                    className={clsx(
-                      "w-full rounded-lg border px-3 py-2 text-sm outline-none hocus:border-brand-500",
-                      formErrors.total_value ? "border-danger" : "border-neutral-200"
-                    )}
+                    className={inputClassName(Boolean(formErrors.valor_total))}
+                    placeholder="R$ 0,00"
                   />
-                  {formErrors.total_value ? (
-                    <p className="text-xs text-danger">{formErrors.total_value}</p>
+                  {formErrors.valor_total ? (
+                    <p className="text-xs text-danger">{formErrors.valor_total}</p>
                   ) : (
                     <p className="text-xs text-neutral-500">
-                      Inclua o valor global contratado com o cliente.
+                      Campo "valor_total" usado na geração automática do saldo.
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-1.5">
                   <label
-                    htmlFor="committed_value"
+                    htmlFor="valor_comprometido"
                     className="text-sm font-medium text-neutral-700"
                   >
                     Valor comprometido (R$)
                   </label>
                   <input
-                    id="committed_value"
-                    type="number"
-                    step="0.01"
-                    name="committed_value"
-                    value={formState.committed_value}
+                    id="valor_comprometido"
+                    type="text"
+                    inputMode="numeric"
+                    name="valor_comprometido"
+                    value={formState.valor_comprometido_display}
                     onChange={handleFormChange}
-                    className={clsx(
-                      "w-full rounded-lg border px-3 py-2 text-sm outline-none hocus:border-brand-500",
-                      formErrors.committed_value ? "border-danger" : "border-neutral-200"
-                    )}
+                    className={inputClassName(Boolean(formErrors.valor_comprometido))}
+                    placeholder="R$ 0,00"
                   />
-                  {formErrors.committed_value ? (
-                    <p className="text-xs text-danger">{formErrors.committed_value}</p>
+                  {formErrors.valor_comprometido ? (
+                    <p className="text-xs text-danger">{formErrors.valor_comprometido}</p>
                   ) : (
                     <p className="text-xs text-neutral-500">
-                      Soma das ESP/RS comprometidas neste contrato.
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="remaining_value"
-                    className="text-sm font-medium text-neutral-700"
-                  >
-                    Saldo disponível (R$)
-                  </label>
-                  <input
-                    id="remaining_value"
-                    type="number"
-                    step="0.01"
-                    name="remaining_value"
-                    value={formState.remaining_value}
-                    onChange={handleFormChange}
-                    className={clsx(
-                      "w-full rounded-lg border px-3 py-2 text-sm outline-none hocus:border-brand-500",
-                      formErrors.remaining_value ? "border-danger" : "border-neutral-200"
-                    )}
-                  />
-                  {formErrors.remaining_value ? (
-                    <p className="text-xs text-danger">{formErrors.remaining_value}</p>
-                  ) : (
-                    <p className="text-xs text-neutral-500">
-                      Informe o saldo atual após compromissos aprovados.
+                      Supabase calcula "valor_disponivel" = total - comprometido.
                     </p>
                   )}
                 </div>
@@ -720,12 +837,9 @@ export default function ContratosPage() {
                     name="status"
                     value={formState.status}
                     onChange={handleFormChange}
-                    className={clsx(
-                      "w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none hocus:border-brand-500",
-                      formErrors.status ? "border-danger" : "border-neutral-200"
-                    )}
+                    className={inputClassName(Boolean(formErrors.status))}
                   >
-                    {CONTRACT_STATUS.map((status) => (
+                    {STATUS_OPTIONS.map((status) => (
                       <option key={status.value} value={status.value}>
                         {status.label}
                       </option>
@@ -733,8 +847,17 @@ export default function ContratosPage() {
                   </select>
                   {formErrors.status ? (
                     <p className="text-xs text-danger">{formErrors.status}</p>
-                  ) : null}
+                  ) : (
+                    <p className="text-xs text-neutral-500">
+                      Valores válidos: rascunho, ativo ou encerrado.
+                    </p>
+                  )}
                 </div>
+              </div>
+
+              <div className="rounded-lg border border-neutral-100 bg-neutral-25 px-3 py-2 text-xs text-neutral-600">
+                O campo <strong>valor_disponivel</strong> é calculado automaticamente pelo Supabase.
+                Atualize o valor comprometido sempre que lançar novas ESP/RS.
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
@@ -743,12 +866,12 @@ export default function ContratosPage() {
                     Cancelar
                   </Button>
                 </Dialog.Close>
-                <Button type="submit" disabled={submitting}>
+                <Button type="submit" disabled={submitDisabled}>
                   {submitting
-                    ? formMode === "create"
+                    ? isCreateMode
                       ? "Salvando..."
                       : "Atualizando..."
-                    : formMode === "create"
+                    : isCreateMode
                       ? "Salvar contrato"
                       : "Atualizar contrato"}
                 </Button>
@@ -760,7 +883,7 @@ export default function ContratosPage() {
 
       <Dialog.Root open={deleteOpen} onOpenChange={handleDeleteDialogChange}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-neutral-900/40 backdrop-blur-sm" />
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-neutral-900/60 backdrop-blur-sm" />
           <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(420px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-neutral-100 bg-white p-6 shadow-card">
             <div className="flex items-start justify-between">
               <Dialog.Title className="text-lg font-semibold text-neutral-900">
@@ -775,9 +898,9 @@ export default function ContratosPage() {
             <Dialog.Description className="mt-1 text-sm text-neutral-500">
               Esta ação é irreversível. O contrato{" "}
               <span className="font-semibold text-neutral-800">
-                {pendingContract?.contract_number}
+                {pendingContract?.numero_contrato}
               </span>{" "}
-              será removido do inventário.
+              será removido da tabela C_CONTRATOS_CLIENTE.
             </Dialog.Description>
 
             {deleteError ? (

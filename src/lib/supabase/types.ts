@@ -23,6 +23,81 @@ export type TablesRow<T> = T extends { Row: infer R } ? R : never;
 export type Database = {
   public: {
     Tables: {
+      "C_CLIENTES": {
+        Row: {
+          id: string;
+          nome: string;
+          documento: string | null;
+          criado_em: string | null;
+        };
+        Insert: {
+          id?: string;
+          nome: string;
+          documento?: string | null;
+          criado_em?: string | null;
+        };
+        Update: {
+          id?: string;
+          nome?: string;
+          documento?: string | null;
+          criado_em?: string | null;
+        };
+      };
+      "C_CONTRATOS_CLIENTE": {
+        Row: {
+          id: string;
+          cliente_id: string | null;
+          numero_contrato: string;
+          data_inicio: string;
+          data_fim: string;
+          valor_total: number;
+          valor_comprometido: number | null;
+          valor_disponivel: number | null;
+          status: string | null;
+        };
+        Insert: {
+          id?: string;
+          cliente_id?: string | null;
+          numero_contrato: string;
+          data_inicio: string;
+          data_fim: string;
+          valor_total: number;
+          valor_comprometido?: number | null;
+          valor_disponivel?: number | null;
+          status?: string | null;
+        };
+        Update: {
+          id?: string;
+          cliente_id?: string | null;
+          numero_contrato?: string;
+          data_inicio?: string;
+          data_fim?: string;
+          valor_total?: number;
+          valor_comprometido?: number | null;
+          valor_disponivel?: number | null;
+          status?: string | null;
+        };
+      };
+      clients: {
+        Row: {
+          id: string;
+          name: string;
+          tax_id: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          tax_id?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          tax_id?: string | null;
+          created_at?: string | null;
+        };
+      };
       "P_clients": {
         Row: {
           id: string;
@@ -41,6 +116,44 @@ export type Database = {
           name?: string;
           tax_id?: string | null;
           created_at?: string | null;
+        };
+      };
+      client_contracts: {
+        Row: {
+          id: string;
+          contract_number: string;
+          client_name: string;
+          start_date: string;
+          end_date: string;
+          total_value: number;
+          remaining_value: number;
+          description: string | null;
+          created_at: string | null;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          contract_number: string;
+          client_name: string;
+          start_date: string;
+          end_date: string;
+          total_value: number;
+          remaining_value: number;
+          description?: string | null;
+          created_at?: string | null;
+          created_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          contract_number?: string;
+          client_name?: string;
+          start_date?: string;
+          end_date?: string;
+          total_value?: number;
+          remaining_value?: number;
+          description?: string | null;
+          created_at?: string | null;
+          created_by?: string | null;
         };
       };
       "P_client_contracts": {
