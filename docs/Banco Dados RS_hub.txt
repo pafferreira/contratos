@@ -1,0 +1,258 @@
+Banco de Dados - Projetos_RS_hub
+
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Create enum types
+CREATE TYPE complexity_level AS ENUM ('baixa', 'media', 'alta', 'muito_alta');
+CREATE TYPE project_status AS ENUM ('planejamento', 'em_andamento', 'homologacao', 'concluido', 'cancelado');
+
+-- Profiles table for user management
+CREATE TABLE public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  full_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  role TEXT DEFAULT 'user',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own profile" ON public.profiles
+  FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "Users can update their own profile" ON public.profiles
+  FOR UPDATE USING (auth.uid() = id);
+
+-- ATE Profiles (Resource profiles with hourly rates)
+CREATE TABLE public.ate_profiles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  description TEXT,
+  hourly_rate DECIMAL(10,2) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES public.profiles(id)
+);
+
+ALTER TABLE public.ate_profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view ATE profiles" ON public.ate_profiles
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Authenticated users can manage ATE profiles" ON public.ate_profiles
+  FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- Client Contracts
+CREATE TABLE public.client_contracts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  contract_number TEXT UNIQUE NOT NULL,
+  client_name TEXT NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  total_value DECIMAL(15,2) NOT NULL,
+  remaining_value DECIMAL(15,2) NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES public.profiles(id)
+);
+
+ALTER TABLE public.client_contracts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view client contracts" ON public.client_contracts
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Authenticated users can manage client contracts" ON public.client_contracts
+  FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- ESP (Service Specifications)
+CREATE TABLE public.client_esp (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  esp_number TEXT UNIQUE NOT NULL,
+  contract_id UUID REFERENCES public.client_contracts(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  total_value DECIMAL(15,2) NOT NULL,
+  remaining_value DECIMAL(15,2) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES public.profiles(id)
+);
+
+ALTER TABLE public.client_esp ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view ESP" ON public.client_esp
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Authenticated users can manage ESP" ON public.client_esp
+  FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- RS (Service Requests / Projects)
+CREATE TABLE public.client_rs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  rs_number TEXT UNIQUE NOT NULL,
+  esp_id UUID REFERENCES public.client_esp(id) ON DELETE CASCADE,
+  service_description TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  justification TEXT,
+  complexity complexity_level NOT NULL,
+  status project_status DEFAULT 'planejamento',
+  planned_start_date DATE NOT NULL,
+  planned_end_date DATE NOT NULL,
+  actual_start_date DATE,
+  actual_end_date DATE,
+  completion_percentage INTEGER DEFAULT 0 CHECK (completion_percentage >= 0 AND completion_percentage <= 100),
+  client_responsible TEXT,
+  bu_responsible TEXT,
+  acceptance_criteria TEXT,
+  observations TEXT,
+  ush_value DECIMAL(10,2) DEFAULT 0,
+  usd_value DECIMAL(10,2) DEFAULT 0,
+  pf_value DECIMAL(10,2) DEFAULT 0,
+  fixed_parcel DECIMAL(10,2) DEFAULT 0,
+  total_value DECIMAL(15,2) GENERATED ALWAYS AS (ush_value + usd_value + pf_value + fixed_parcel) STORED,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES public.profiles(id)
+);
+
+ALTER TABLE public.client_rs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view RS" ON public.client_rs
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Authenticated users can manage RS" ON public.client_rs
+  FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- Supplier Contracts
+CREATE TABLE public.supplier_contracts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  contract_number TEXT UNIQUE NOT NULL,
+  supplier_name TEXT NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  total_value DECIMAL(15,2) NOT NULL,
+  remaining_value DECIMAL(15,2) NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES public.profiles(id)
+);
+
+ALTER TABLE public.supplier_contracts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view supplier contracts" ON public.supplier_contracts
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Authenticated users can manage supplier contracts" ON public.supplier_contracts
+  FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- OS (Service Orders)
+CREATE TABLE public.supplier_os (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  os_number TEXT UNIQUE NOT NULL,
+  contract_id UUID REFERENCES public.supplier_contracts(id) ON DELETE CASCADE,
+  opening_date DATE NOT NULL,
+  total_value DECIMAL(15,2) NOT NULL,
+  reserved_value DECIMAL(15,2) DEFAULT 0,
+  remaining_value DECIMAL(15,2) NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES public.profiles(id)
+);
+
+ALTER TABLE public.supplier_os ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view OS" ON public.supplier_os
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Authenticated users can manage OS" ON public.supplier_os
+  FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- ATEs (Technical Support Resources)
+CREATE TABLE public.ates (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  profile_id UUID REFERENCES public.ate_profiles(id) ON DELETE SET NULL,
+  contract_id UUID REFERENCES public.supplier_contracts(id) ON DELETE SET NULL,
+  os_id UUID REFERENCES public.supplier_os(id) ON DELETE SET NULL,
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES public.profiles(id)
+);
+
+ALTER TABLE public.ates ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view ATEs" ON public.ates
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Authenticated users can manage ATEs" ON public.ates
+  FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- Project ATEs (Many-to-many relationship between projects and ATEs)
+CREATE TABLE public.project_ates (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  rs_id UUID REFERENCES public.client_rs(id) ON DELETE CASCADE,
+  ate_id UUID REFERENCES public.ates(id) ON DELETE CASCADE,
+  allocated_hours DECIMAL(10,2) DEFAULT 0,
+  worked_hours DECIMAL(10,2) DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(rs_id, ate_id)
+);
+
+ALTER TABLE public.project_ates ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view project ATEs" ON public.project_ates
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Authenticated users can manage project ATEs" ON public.project_ates
+  FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- Evidence (for project acceptance)
+CREATE TABLE public.evidence (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  rs_id UUID REFERENCES public.client_rs(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  file_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES public.profiles(id)
+);
+
+ALTER TABLE public.evidence ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view evidence" ON public.evidence
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Authenticated users can manage evidence" ON public.evidence
+  FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- Trigger for updating timestamps
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+   NEW.updated_at = NOW();
+   RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_profiles_updated_at
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- Trigger to create profile on user signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, email)
+  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'full_name', ''), NEW.email);
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
+
