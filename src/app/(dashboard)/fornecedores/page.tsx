@@ -964,11 +964,11 @@ export default function ContratosFornecedorPage() {
                 </div>
 
                 <div className="flex items-center gap-2 text-neutral-700">
-
-                  <CalendarDays className="h-4 w-4 text-neutral-400" />
-
+                  <p className="text-neutral-500">Vigência</p>
+                  <CalendarDays className="h-4 w-4 text-neutral-400" /> 
+                  
                   <span>{formatDateRange(contract.data_inicio, contract.data_fim)}</span>
-
+                  
                 </div>
 
               </div>

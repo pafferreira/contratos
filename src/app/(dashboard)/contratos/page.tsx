@@ -610,7 +610,7 @@ export default function ContratosPage() {
                   <tr className="text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
                     <th className="px-3 py-3">Contrato</th>
                     <th className="px-3 py-3">Cliente</th>
-                    <th className="px-3 py-3">Período</th>
+                    <th className="px-3 py-3">Vigência</th>
                     <th className="px-3 py-3">Valor total</th>
                     <th className="px-3 py-3">Comprometido</th>
                     <th className="px-3 py-3">Saldo disponível</th>
