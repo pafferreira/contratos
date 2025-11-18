@@ -9,6 +9,7 @@ import { format, parseISO } from "date-fns";
 import clsx from "clsx";
 
 import * as Dialog from "@radix-ui/react-dialog";
+import * as Tooltip from "@radix-ui/react-tooltip";
 
 import { CalendarDays, Pencil, Plus, RefreshCcw, Trash2, X } from "lucide-react";
 
@@ -120,7 +121,7 @@ const ContractFormSchema = z
 
     fornecedor_id: z.string().trim().min(1, "Selecione o fornecedor"),
 
-    numero_contrato: z.string().trim().min(1, "Informe o nÃºmero do contrato"),
+    numero_contrato: z.string().trim().min(1, "Informe o número do contrato"),
 
     data_inicio: z.string().trim().min(1, "Informe a data inicial"),
 
@@ -195,7 +196,7 @@ function formatCurrency(value?: number | null) {
 
   if (typeof value !== "number") {
 
-    return "â€”";
+    return "até";
 
   }
 
@@ -205,15 +206,15 @@ function formatCurrency(value?: number | null) {
 
 function formatDateRange(start?: string | null, end?: string | null) {
 
-  if (!start || !end) return "PerÃ­odo nÃ£o informado";
+  if (!start || !end) return "Perí­odo não informado";
 
   try {
 
-    return `${format(parseISO(start), "dd/MM/yyyy")} â€” ${format(parseISO(end), "dd/MM/yyyy")}`;
+    return `${format(parseISO(start), "dd/MM/yyyy")} até ${format(parseISO(end), "dd/MM/yyyy")}`;
 
   } catch {
 
-    return `${start} â€” ${end}`;
+    return `${start} até ${end}`;
 
   }
 
@@ -425,7 +426,7 @@ export default function ContratosFornecedorPage() {
 
   };
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
 
     setFormState({ ...EMPTY_FORM_STATE });
 
@@ -433,7 +434,20 @@ export default function ContratosFornecedorPage() {
 
     setActiveContractId(null);
 
-  };
+  }, []);
+
+  const handleFormDialogChange = useCallback(
+    (open: boolean) => {
+      if (!open) {
+        setFormOpen(false);
+        resetForm();
+        setSubmitting(false);
+      } else {
+        setFormOpen(true);
+      }
+    },
+    [resetForm]
+  );
 
   const openCreateForm = () => {
 
@@ -657,7 +671,7 @@ export default function ContratosFornecedorPage() {
 
         title="Contratos de Fornecedor"
 
-        subtitle="Gerencie contratos, vigÃªncias e valores negociados com fornecedores."
+        subtitle="Gerencie contratos, vigências e valores negociados com fornecedores."
 
         actions={
 
@@ -689,7 +703,7 @@ export default function ContratosFornecedorPage() {
 
           <label className="text-sm font-medium text-neutral-600">
 
-            Buscar por nÃºmero ou fornecedor
+            Buscar por número ou fornecedor
 
           </label>
 
@@ -799,55 +813,115 @@ export default function ContratosFornecedorPage() {
 
                   <p className="text-sm text-neutral-600">
 
-                    {contract.fornecedor?.nome ?? "Fornecedor n8o informado"}
+                    {contract.fornecedor?.nome ?? "Fornecedor não informado"}
 
                   </p>
 
                 </div>
 
-                <div className="flex items-center gap-2">
+                <Tooltip.Provider delayDuration={150}>
 
-                  <Button
+                  <div className="flex items-center gap-2">
 
-                    variant="secondary"
+                    <Tooltip.Root>
 
-                    size="sm"
+                      <Tooltip.Trigger asChild>
 
-                    onClick={() => openEditForm(contract)}
+                        <Button
 
-                  >
+                          variant="secondary"
 
-                    <Pencil className="mr-2 h-4 w-4" />
+                          size="sm"
 
-                    Editar
+                          onClick={() => openEditForm(contract)}
 
-                  </Button>
+                        >
 
-                  <Button
+                          <Pencil className="mr-2 h-4 w-4" />
 
-                    variant="ghost"
+                          Editar
 
-                    size="icon"
+                        </Button>
 
-                    onClick={() => {
+                      </Tooltip.Trigger>
 
-                      setPendingContract(contract);
+                      <Tooltip.Portal>
 
-                      setDeleteOpen(true);
+                        <Tooltip.Content
 
-                      setDeleteError(null);
+                          side="top"
 
-                    }}
+                          sideOffset={6}
 
-                    aria-label="Excluir contrato"
+                        className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
 
-                  >
+                        >
 
-                    <Trash2 className="h-4 w-4" />
+                          Editar contrato
 
-                  </Button>
+                          <Tooltip.Arrow className="fill-white" />
 
-                </div>
+                        </Tooltip.Content>
+
+                      </Tooltip.Portal>
+
+                    </Tooltip.Root>
+
+                    <Tooltip.Root>
+
+                      <Tooltip.Trigger asChild>
+
+                        <Button
+
+                          variant="ghost"
+
+                          size="icon"
+
+                          onClick={() => {
+
+                            setPendingContract(contract);
+
+                            setDeleteOpen(true);
+
+                            setDeleteError(null);
+
+                          }}
+
+                          aria-label="Excluir contrato"
+
+                        >
+
+                          <Trash2 className="h-4 w-4" />
+
+                        </Button>
+
+                      </Tooltip.Trigger>
+
+                      <Tooltip.Portal>
+
+                        <Tooltip.Content
+
+                          side="top"
+
+                          sideOffset={6}
+
+                        className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+
+                        >
+
+                          Excluir contrato
+
+                          <Tooltip.Arrow className="fill-white" />
+
+                        </Tooltip.Content>
+
+                      </Tooltip.Portal>
+
+                    </Tooltip.Root>
+
+                  </div>
+
+                </Tooltip.Provider>
 
               </div>
 
@@ -879,7 +953,7 @@ export default function ContratosFornecedorPage() {
 
                 <div>
 
-                  <p className="text-neutral-500">Saldo disponÃ­vel</p>
+                  <p className="text-neutral-500">Saldo disponí­vel</p>
 
                   <p className="font-medium text-success">
 
@@ -907,23 +981,7 @@ export default function ContratosFornecedorPage() {
 
       )}
 
-      <Dialog.Root
-
-        open={formOpen}
-
-        onOpenChange={(open) => {
-
-          setFormOpen(open);
-
-          if (!open) {
-
-            resetForm();
-
-          }
-
-        }}
-
-      >
+      <Dialog.Root open={formOpen} onOpenChange={handleFormDialogChange}>
 
         <Dialog.Portal>
 
@@ -931,32 +989,7 @@ export default function ContratosFornecedorPage() {
 
           <Dialog.Content
 
-            className="fixed inset-0 flex items-start justify-center overflow-y-auto p-4"
-
-            onEscapeKeyDown={() => {
-
-              if (!submitting) {
-
-                setFormOpen(false);
-
-                resetForm();
-
-              }
-
-            }}
-
-            onPointerDownOutside={() => {
-
-              if (!submitting) {
-
-                setFormOpen(false);
-
-                resetForm();
-
-              }
-
-            }}
-
+            className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4"
           >
 
             <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
@@ -1059,7 +1092,7 @@ export default function ContratosFornecedorPage() {
 
                 <div>
 
-                  <label className="text-sm font-medium text-neutral-700">NÃºmero do contrato</label>
+                  <label className="text-sm font-medium text-neutral-700">Número do contrato</label>
 
                   <input
 
@@ -1087,7 +1120,7 @@ export default function ContratosFornecedorPage() {
 
                   <div>
 
-                    <label className="text-sm font-medium text-neutral-700">InÃ­cio da vigÃªncia</label>
+                    <label className="text-sm font-medium text-neutral-700">Início da vigência</label>
 
                     <input
 
@@ -1113,7 +1146,7 @@ export default function ContratosFornecedorPage() {
 
                   <div>
 
-                    <label className="text-sm font-medium text-neutral-700">Fim da vigÃªncia</label>
+                    <label className="text-sm font-medium text-neutral-700">Fim da vigência</label>
 
                     <input
 
@@ -1228,6 +1261,7 @@ export default function ContratosFornecedorPage() {
                     ) : null}
 
                   </div>
+                </div>
 
                 <div className="flex items-center justify-end gap-3 pt-2">
 
@@ -1271,13 +1305,13 @@ export default function ContratosFornecedorPage() {
 
               <Dialog.Title className="text-lg font-semibold text-neutral-900">
 
-                Confirmar exclusÃ£o
+                Confirmar exclusão
 
               </Dialog.Title>
 
               <Dialog.Description className="mt-2 text-sm text-neutral-600">
 
-                Tem certeza que deseja excluir o contrato {pendingContract?.numero_contrato}? Essa aÃ§Ã£o nÃ£o pode ser desfeita.
+                Tem certeza que deseja excluir o contrato {pendingContract?.numero_contrato} ? Essa ação não pode ser desfeita.
 
               </Dialog.Description>
 

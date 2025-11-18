@@ -5,6 +5,7 @@ import type { ChangeEvent, FormEvent } from "react";
 import { format, parseISO } from "date-fns";
 import clsx from "clsx";
 import * as Dialog from "@radix-ui/react-dialog";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import { CalendarDays, Pencil, Plus, RefreshCcw, Trash2, X } from "lucide-react";
 import { z } from "zod";
 
@@ -499,29 +500,57 @@ export default function ContratosPage() {
                       </h3>
                       <p className="text-xs text-neutral-500">{contract.id}</p>
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditForm(contract)}
-                        aria-label={`Editar contrato ${contract.numero_contrato}`}
-                        title="Editar contrato"
-                        disabled={supabaseUnavailable}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-danger"
-                        onClick={() => openDeleteDialog(contract)}
-                        aria-label={`Excluir contrato ${contract.numero_contrato}`}
-                        title="Excluir contrato"
-                        disabled={supabaseUnavailable}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Tooltip.Provider delayDuration={150}>
+                      <div className="flex flex-col gap-2">
+                        <Tooltip.Root>
+                          <Tooltip.Trigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditForm(contract)}
+                              aria-label={`Editar contrato ${contract.numero_contrato}`}
+                              disabled={supabaseUnavailable}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content
+                              side="top"
+                              sideOffset={6}
+                              className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                            >
+                              Editar contrato
+                              <Tooltip.Arrow className="fill-white" />
+                            </Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                        <Tooltip.Root>
+                          <Tooltip.Trigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-danger"
+                              onClick={() => openDeleteDialog(contract)}
+                              aria-label={`Excluir contrato ${contract.numero_contrato}`}
+                              disabled={supabaseUnavailable}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content
+                              side="top"
+                              sideOffset={6}
+                              className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                            >
+                              Excluir contrato
+                              <Tooltip.Arrow className="fill-white" />
+                            </Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                      </div>
+                    </Tooltip.Provider>
                   </div>
                   <dl className="grid grid-cols-2 gap-3 text-sm">
                     <div>
@@ -626,29 +655,57 @@ export default function ContratosPage() {
                         </span>
                       </td>
                       <td className="px-3 py-4 text-right">
-                        <div className="flex flex-col items-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditForm(contract)}
-                            aria-label={`Editar contrato ${contract.numero_contrato}`}
-                            title="Editar contrato"
-                            disabled={supabaseUnavailable}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-danger"
-                            onClick={() => openDeleteDialog(contract)}
-                            aria-label={`Excluir contrato ${contract.numero_contrato}`}
-                            title="Excluir contrato"
-                            disabled={supabaseUnavailable}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <Tooltip.Provider delayDuration={150}>
+                          <div className="flex flex-col items-end gap-1">
+                            <Tooltip.Root>
+                              <Tooltip.Trigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openEditForm(contract)}
+                                  aria-label={`Editar contrato ${contract.numero_contrato}`}
+                                  disabled={supabaseUnavailable}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </Tooltip.Trigger>
+                              <Tooltip.Portal>
+                                <Tooltip.Content
+                                  side="top"
+                                  sideOffset={6}
+                                  className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                                >
+                                  Editar contrato
+                                  <Tooltip.Arrow className="fill-white" />
+                                </Tooltip.Content>
+                              </Tooltip.Portal>
+                            </Tooltip.Root>
+                            <Tooltip.Root>
+                              <Tooltip.Trigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-danger"
+                                  onClick={() => openDeleteDialog(contract)}
+                                  aria-label={`Excluir contrato ${contract.numero_contrato}`}
+                                  disabled={supabaseUnavailable}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </Tooltip.Trigger>
+                              <Tooltip.Portal>
+                                <Tooltip.Content
+                                  side="top"
+                                  sideOffset={6}
+                                  className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                                >
+                                  Excluir contrato
+                                  <Tooltip.Arrow className="fill-white" />
+                                </Tooltip.Content>
+                              </Tooltip.Portal>
+                            </Tooltip.Root>
+                          </div>
+                        </Tooltip.Provider>
                       </td>
                     </tr>
                   ))}
@@ -673,9 +730,9 @@ export default function ContratosPage() {
                 </Button>
               </Dialog.Close>
             </div>
-            <Dialog.Description className="mt-1 text-sm text-neutral-500">
+            {/* <Dialog.Description className="mt-1 text-sm text-neutral-500">
               Os campos utilizam os mesmos nomes do Supabase (ex.: C_CONTRATOS_CLIENTE).
-            </Dialog.Description>
+            </Dialog.Description> */}
 
             <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
               {formErrors.general ? (
@@ -710,7 +767,7 @@ export default function ContratosPage() {
                     <p className="text-xs text-danger">{formErrors.cliente_id}</p>
                   ) : (
                     <p className="text-xs text-neutral-500">
-                      Fonte: tabela C_CLIENTES do Supabase Inventário.
+                      Fonte: tabela de CLIENTES cadastrados.
                     </p>
                   )}
                 </div>
@@ -734,7 +791,7 @@ export default function ContratosPage() {
                     <p className="text-xs text-danger">{formErrors.numero_contrato}</p>
                   ) : (
                     <p className="text-xs text-neutral-500">
-                      Campo equivalente a "numero_contrato" em C_CONTRATOS_CLIENTE.
+                      Numero do Contrato registrado
                     </p>
                   )}
                 </div>
@@ -797,7 +854,7 @@ export default function ContratosPage() {
                     <p className="text-xs text-danger">{formErrors.valor_total}</p>
                   ) : (
                     <p className="text-xs text-neutral-500">
-                      Campo "valor_total" usado na geração automática do saldo.
+                      Campo usado na geração automática do saldo.
                     </p>
                   )}
                 </div>
@@ -823,7 +880,7 @@ export default function ContratosPage() {
                     <p className="text-xs text-danger">{formErrors.valor_comprometido}</p>
                   ) : (
                     <p className="text-xs text-neutral-500">
-                      Supabase calcula "valor_disponivel" = total - comprometido.
+                      Cálculo do Vl Disponível = Vl Total - Vl Comprometido
                     </p>
                   )}
                 </div>
@@ -849,14 +906,14 @@ export default function ContratosPage() {
                     <p className="text-xs text-danger">{formErrors.status}</p>
                   ) : (
                     <p className="text-xs text-neutral-500">
-                      Valores válidos: rascunho, ativo ou encerrado.
+                      Valores: rascunho, ativo ou encerrado.
                     </p>
                   )}
                 </div>
               </div>
 
               <div className="rounded-lg border border-neutral-100 bg-neutral-25 px-3 py-2 text-xs text-neutral-600">
-                O campo <strong>valor_disponivel</strong> é calculado automaticamente pelo Supabase.
+                O campo <strong>valor_disponivel</strong> é calculado automaticamente pelo Sistema.
                 Atualize o valor comprometido sempre que lançar novas ESP/RS.
               </div>
 
@@ -896,11 +953,12 @@ export default function ContratosPage() {
               </Dialog.Close>
             </div>
             <Dialog.Description className="mt-1 text-sm text-neutral-500">
-              Esta ação é irreversível. O contrato{" "}
+              Confirma a exclusão do contrato {" "}
               <span className="font-semibold text-neutral-800">
                 {pendingContract?.numero_contrato}
-              </span>{" "}
-              será removido da tabela C_CONTRATOS_CLIENTE.
+              </span>{" "} ?  
+               Essa ação não pode ser desfeita.
+              
             </Dialog.Description>
 
             {deleteError ? (
