@@ -137,7 +137,7 @@ const ContractFormSchema = z
 
       .transform(Number)
 
-      .refine((value) => !Number.isNaN(value), "Valor total invÃ¡lido")
+      .refine((value) => !Number.isNaN(value), "Valor total inválido")
 
       .refine((value) => value > 0, "O valor total deve ser maior que zero"),
 
@@ -149,9 +149,9 @@ const ContractFormSchema = z
 
       .transform((value) => (value === "" ? 0 : Number(value)))
 
-      .refine((value) => !Number.isNaN(value), "Valor comprometido invÃ¡lido")
+      .refine((value) => !Number.isNaN(value), "Valor comprometido inválido")
 
-      .refine((value) => value >= 0, "O valor comprometido nÃ£o pode ser negativo"),
+      .refine((value) => value >= 0, "O valor comprometido não pode ser negativo"),
 
     status: z.string().trim().min(1, "Selecione um status"),
   })
@@ -184,7 +184,7 @@ const ContractFormSchema = z
 
     {
 
-      message: "O valor comprometido nÃ£o pode ser maior que o total",
+      message: "O valor comprometido não pode ser maior que o total",
 
       path: ["valor_comprometido"]
 
@@ -694,16 +694,13 @@ export default function ContratosFornecedorPage() {
       <PageHeader
 
         title="Contratos de Fornecedor"
-
         subtitle="Gerencie contratos, vigências e valores negociados com fornecedores."
 
         actions={
-
           <Button onClick={openCreateForm}>
             <Plus className="mr-2 size-4" />
             Novo contrato
           </Button>
-
         }
 
       />
@@ -745,49 +742,27 @@ export default function ContratosFornecedorPage() {
         </div>
 
         <div className="flex flex-col gap-2">
-
           <span className="text-sm font-medium text-neutral-600">Visualização</span>
-
           <div className="flex items-center gap-2">
-
             <div className="flex rounded-lg border border-neutral-200 bg-white p-1">
-
               <Button
-
                 type="button"
-
                 size="icon"
-
                 variant={viewMode === "cards" ? "primary" : "ghost"}
-
                 onClick={() => setViewMode("cards")}
-
                 aria-pressed={viewMode === "cards"}
-
               >
-
                 <LayoutGrid className="size-4" />
-
               </Button>
-
               <Button
-
                 type="button"
-
                 size="icon"
-
                 variant={viewMode === "list" ? "primary" : "ghost"}
-
                 onClick={() => setViewMode("list")}
-
                 aria-pressed={viewMode === "list"}
-
               >
-
                 <List className="size-4" />
-
               </Button>
-
             </div>
 
             <Button
