@@ -947,8 +947,7 @@ export default function RecursosPage() {
           <Dialog.Root open={formOpen} onOpenChange={handleFormDialogChange}>
             <Dialog.Portal>
               <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
-              <Dialog.Content className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
-                <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
+              <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl focus:outline-none">
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <Dialog.Title className="text-lg font-semibold text-neutral-900">
@@ -1087,23 +1086,21 @@ export default function RecursosPage() {
                   </Button>
                 </div>
               </form>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
 
       <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
-          <Dialog.Content className="fixed inset-0 flex items-center justify-center p-4">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-              <Dialog.Title className="text-lg font-semibold text-neutral-900">
-                Confirmar exclusão
-              </Dialog.Title>
-              <Dialog.Description className="mt-2 text-sm text-neutral-600">
-                Tem certeza que deseja excluir o recurso {pendingResource?.nome_completo}? Essa ação
-                não pode ser desfeita.
-              </Dialog.Description>
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl focus:outline-none">
+            <Dialog.Title className="text-lg font-semibold text-neutral-900">
+              Confirmar exclusão
+            </Dialog.Title>
+            <Dialog.Description className="mt-2 text-sm text-neutral-600">
+              Tem certeza que deseja excluir o recurso {pendingResource?.nome_completo}? Essa ação
+              não pode ser desfeita.
+            </Dialog.Description>
 
               {deleteError ? (
                 <div className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -1126,7 +1123,6 @@ export default function RecursosPage() {
                   {deleteLoading ? "Excluindo..." : "Excluir"}
                 </Button>
               </div>
-            </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
@@ -1269,13 +1265,12 @@ export default function RecursosPage() {
           <Dialog.Root open={profileFormOpen} onOpenChange={handleProfileFormDialogChange}>
             <Dialog.Portal>
               <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
-              <Dialog.Content className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
-                <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div>
-                      <Dialog.Title className="text-lg font-semibold text-neutral-900">
-                        {profileIsCreateMode ? "Novo perfil" : "Editar perfil"}
-                      </Dialog.Title>
+              <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl focus:outline-none">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <Dialog.Title className="text-lg font-semibold text-neutral-900">
+                      {profileIsCreateMode ? "Novo perfil" : "Editar perfil"}
+                    </Dialog.Title>
                       <Dialog.Description className="text-sm text-neutral-500">
                         Cadastre perfis com descrição e valor hora padrão.
                       </Dialog.Description>
@@ -1359,45 +1354,42 @@ export default function RecursosPage() {
                       </Button>
                     </div>
                   </form>
-                </div>
-              </Dialog.Content>
-            </Dialog.Portal>
-          </Dialog.Root>
+                </Dialog.Content>
+              </Dialog.Portal>
+            </Dialog.Root>
 
           <Dialog.Root open={profileDeleteOpen} onOpenChange={setProfileDeleteOpen}>
             <Dialog.Portal>
               <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
-              <Dialog.Content className="fixed inset-0 flex items-center justify-center p-4">
-                <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-                  <Dialog.Title className="text-lg font-semibold text-neutral-900">
-                    Confirmar exclusão
-                  </Dialog.Title>
-                  <Dialog.Description className="mt-2 text-sm text-neutral-600">
-                    Tem certeza que deseja excluir o perfil {pendingProfile?.nome}? Essa ação não pode
-                    ser desfeita.
-                  </Dialog.Description>
+              <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl focus:outline-none">
+                <Dialog.Title className="text-lg font-semibold text-neutral-900">
+                  Confirmar exclusão
+                </Dialog.Title>
+                <Dialog.Description className="mt-2 text-sm text-neutral-600">
+                  Tem certeza que deseja excluir o perfil {pendingProfile?.nome}? Essa ação não pode
+                  ser desfeita.
+                </Dialog.Description>
 
-                  {profileDeleteError ? (
-                    <div className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
-                      {profileDeleteError}
-                    </div>
-                  ) : null}
-
-                  <div className="mt-6 flex justify-end gap-3">
-                    <Dialog.Close asChild>
-                      <Button variant="outline" type="button" onClick={() => setPendingProfile(null)}>
-                        Cancelar
-                      </Button>
-                    </Dialog.Close>
-                    <Button
-                      variant="destructive"
-                      type="button"
-                      onClick={handleProfileDelete}
-                      disabled={profileDeleteLoading}
-                    >
-                      {profileDeleteLoading ? "Excluindo..." : "Excluir"}
-                    </Button>
+                {profileDeleteError ? (
+                  <div className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
+                    {profileDeleteError}
                   </div>
+                ) : null}
+
+                <div className="mt-6 flex justify-end gap-3">
+                  <Dialog.Close asChild>
+                    <Button variant="outline" type="button" onClick={() => setPendingProfile(null)}>
+                      Cancelar
+                    </Button>
+                  </Dialog.Close>
+                  <Button
+                    variant="destructive"
+                    type="button"
+                    onClick={handleProfileDelete}
+                    disabled={profileDeleteLoading}
+                  >
+                    {profileDeleteLoading ? "Excluindo..." : "Excluir"}
+                  </Button>
                 </div>
               </Dialog.Content>
             </Dialog.Portal>
