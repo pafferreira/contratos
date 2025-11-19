@@ -258,6 +258,52 @@ export type Database = {
         };
 
       };
+      "C_PERFIS_RECURSOS": {
+        Row: {
+          id: string;
+          nome: string;
+          descricao: string | null;
+          valor_hora: number;
+        };
+        Insert: {
+          id?: string;
+          nome: string;
+          descricao?: string | null;
+          valor_hora: number;
+        };
+        Update: {
+          id?: string;
+          nome?: string;
+          descricao?: string | null;
+          valor_hora?: number;
+        };
+      };
+      "C_RECURSOS_FORNECEDOR": {
+        Row: {
+          id: string;
+          fornecedor_id: string | null;
+          perfil_id: string | null;
+          nome_completo: string;
+          email: string | null;
+          ativo: boolean | null;
+        };
+        Insert: {
+          id?: string;
+          fornecedor_id?: string | null;
+          perfil_id?: string | null;
+          nome_completo: string;
+          email?: string | null;
+          ativo?: boolean | null;
+        };
+        Update: {
+          id?: string;
+          fornecedor_id?: string | null;
+          perfil_id?: string | null;
+          nome_completo?: string;
+          email?: string | null;
+          ativo?: boolean | null;
+        };
+      };
 
       clients: {
 

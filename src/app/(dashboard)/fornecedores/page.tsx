@@ -11,7 +11,7 @@ import clsx from "clsx";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Tooltip from "@radix-ui/react-tooltip";
 
-import { CalendarDays, Pencil, Plus, RefreshCcw, Trash2, X } from "lucide-react";
+import { CalendarDays, LayoutGrid, List, Pencil, Plus, RefreshCcw, Trash2, X } from "lucide-react";
 
 import { z } from "zod";
 
@@ -299,6 +299,7 @@ export default function ContratosFornecedorPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
 
   const suppliersMap = useMemo(() => {
 
@@ -677,7 +678,7 @@ export default function ContratosFornecedorPage() {
 
           <Button onClick={openCreateForm}>
 
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="mr-2 size-4" />
 
             Novo contrato fornecedor
 
@@ -723,25 +724,77 @@ export default function ContratosFornecedorPage() {
 
         </div>
 
-        <Button
+        <div className="flex flex-col gap-2">
 
-          variant="secondary"
+          <span className="text-sm font-medium text-neutral-600">Visualização</span>
 
-          size="sm"
+          <div className="flex items-center gap-2">
 
-          onClick={handleRefresh}
+            <div className="flex rounded-lg border border-neutral-200 bg-white p-1">
 
-          disabled={refreshing}
+              <Button
 
-        >
+                type="button"
 
-          <RefreshCcw className={clsx("mr-2 h-4 w-4", refreshing && "animate-spin")}
+                size="icon"
+
+                variant={viewMode === "cards" ? "default" : "ghost"}
+
+                onClick={() => setViewMode("cards")}
+
+                aria-pressed={viewMode === "cards"}
+
+              >
+
+                <LayoutGrid className="size-4" />
+
+              </Button>
+
+              <Button
+
+                type="button"
+
+                size="icon"
+
+                variant={viewMode === "list" ? "default" : "ghost"}
+
+                onClick={() => setViewMode("list")}
+
+                aria-pressed={viewMode === "list"}
+
+              >
+
+                <List className="size-4" />
+
+              </Button>
+
+            </div>
+
+            <Button
+
+              variant="secondary"
+
+              size="sm"
+
+              onClick={handleRefresh}
+
+              disabled={refreshing}
+
+              type="button"
+
+            >
+
+              <RefreshCcw className={clsx("mr-2 size-4", refreshing && "animate-spin")}
 
  />
 
-          Atualizar
+              Atualizar
 
-        </Button>
+            </Button>
+
+          </div>
+
+        </div>
 
       </div>
 
@@ -765,7 +818,7 @@ export default function ContratosFornecedorPage() {
 
         </Card>
 
-      ) : (
+      ) : viewMode === "cards" ? (
 
         <div className="grid gap-4 xl:grid-cols-2">
 
@@ -837,7 +890,7 @@ export default function ContratosFornecedorPage() {
 
                         >
 
-                          <Pencil className="mr-2 h-4 w-4" />
+                          <Pencil className="mr-2 size-4" />
 
                           Editar
 
@@ -891,7 +944,7 @@ export default function ContratosFornecedorPage() {
 
                         >
 
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="size-4" />
 
                         </Button>
 
@@ -953,7 +1006,7 @@ export default function ContratosFornecedorPage() {
 
                 <div>
 
-                  <p className="text-neutral-500">Saldo disponí­vel</p>
+                  <p className="text-neutral-500">Saldo disponível</p>
 
                   <p className="font-medium text-success">
 
@@ -964,11 +1017,13 @@ export default function ContratosFornecedorPage() {
                 </div>
 
                 <div className="flex items-center gap-2 text-neutral-700">
+
                   <p className="text-neutral-500">Vigência</p>
-                  <CalendarDays className="h-4 w-4 text-neutral-400" /> 
-                  
+
+                  <CalendarDays className="size-4 text-neutral-400" />
+
                   <span>{formatDateRange(contract.data_inicio, contract.data_fim)}</span>
-                  
+
                 </div>
 
               </div>
@@ -979,8 +1034,233 @@ export default function ContratosFornecedorPage() {
 
         </div>
 
-      )}
+      ) : (
 
+        <Card className="overflow-hidden">
+
+          <div className="overflow-x-auto">
+
+            <table className="min-w-full divide-y divide-neutral-200 text-sm">
+
+              <thead className="bg-neutral-50 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
+
+                <tr>
+
+                  <th className="px-4 py-3">Contrato</th>
+
+                  <th className="px-4 py-3">Valores</th>
+
+                  <th className="px-4 py-3">Vigência</th>
+
+                  <th className="px-4 py-3">Status</th>
+
+                  <th className="px-4 py-3 text-right">Ações</th>
+
+                </tr>
+
+              </thead>
+
+              <tbody className="divide-y divide-neutral-100 text-neutral-700">
+
+                {filteredContracts.map((contract) => {
+
+                  const statusLabel =
+
+                    STATUS_OPTIONS.find((option) => option.value === contract.status)?.label ??
+
+                    "Sem status";
+
+                  return (
+
+                    <tr key={`${contract.id}-list`}>
+
+                      <td className="px-4 py-3">
+
+                        <p className="font-semibold text-neutral-900">
+
+                          {contract.numero_contrato}
+
+                        </p>
+
+                        <p className="text-xs text-neutral-500">
+
+                          {contract.fornecedor?.nome ?? "Fornecedor não informado"}
+
+                        </p>
+
+                      </td>
+
+                      <td className="px-4 py-3">
+
+                        <p className="font-semibold text-neutral-900">
+
+                          {formatCurrency(contract.valor_total)}
+
+                        </p>
+
+                        <p className="text-xs text-neutral-500">
+
+                          Comprometido: {formatCurrency(contract.valor_comprometido)}
+
+                        </p>
+
+                      </td>
+
+                      <td className="px-4 py-3">
+
+                        {formatDateRange(contract.data_inicio, contract.data_fim)}
+
+                      </td>
+
+                      <td className="px-4 py-3">
+
+                        <span
+
+                          className={clsx(
+
+                            "rounded-full px-2 py-0.5 text-xs font-medium",
+
+                            statusStyles[contract.status ?? "rascunho"] ??
+
+                              "bg-neutral-100 text-neutral-600"
+
+                          )}
+
+                        >
+
+                          {statusLabel}
+
+                        </span>
+
+                      </td>
+
+                      <td className="px-4 py-3 text-right">
+
+                        <Tooltip.Provider delayDuration={150}>
+
+                          <div className="flex items-center justify-end gap-2">
+
+                            <Tooltip.Root>
+
+                              <Tooltip.Trigger asChild>
+
+                                <Button
+
+                                  variant="secondary"
+
+                                  size="sm"
+
+                                  onClick={() => openEditForm(contract)}
+
+                                  type="button"
+
+                                >
+
+                                  <Pencil className="mr-2 size-4" />
+
+                                  Editar
+
+                                </Button>
+
+                              </Tooltip.Trigger>
+
+                              <Tooltip.Portal>
+
+                                <Tooltip.Content
+
+                                  side="top"
+
+                                  sideOffset={6}
+
+                                  className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+
+                                >
+
+                                  Editar contrato
+
+                                  <Tooltip.Arrow className="fill-white" />
+
+                                </Tooltip.Content>
+
+                              </Tooltip.Portal>
+
+                            </Tooltip.Root>
+
+                            <Tooltip.Root>
+
+                              <Tooltip.Trigger asChild>
+
+                                <Button
+
+                                  variant="ghost"
+
+                                  size="icon"
+
+                                  type="button"
+
+                                  onClick={() => {
+
+                                    setPendingContract(contract);
+
+                                    setDeleteOpen(true);
+
+                                    setDeleteError(null);
+
+                                  }}
+
+                                  aria-label="Excluir contrato"
+
+                                >
+
+                                  <Trash2 className="size-4" />
+
+                                </Button>
+
+                              </Tooltip.Trigger>
+
+                              <Tooltip.Portal>
+
+                                <Tooltip.Content
+
+                                  side="top"
+
+                                  sideOffset={6}
+
+                                  className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+
+                                >
+
+                                  Excluir contrato
+
+                                  <Tooltip.Arrow className="fill-white" />
+
+                                </Tooltip.Content>
+
+                              </Tooltip.Portal>
+
+                            </Tooltip.Root>
+
+                          </div>
+
+                        </Tooltip.Provider>
+
+                      </td>
+
+                    </tr>
+
+                  );
+
+                })}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </Card>
+
+      )}
       <Dialog.Root open={formOpen} onOpenChange={handleFormDialogChange}>
 
         <Dialog.Portal>
@@ -1026,7 +1306,7 @@ export default function ContratosFornecedorPage() {
 
                   >
 
-                    <X className="h-4 w-4" />
+                    <X className="size-4" />
 
                   </button>
 

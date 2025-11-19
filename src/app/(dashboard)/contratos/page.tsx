@@ -6,7 +6,7 @@ import { format, parseISO } from "date-fns";
 import clsx from "clsx";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { CalendarDays, Pencil, Plus, RefreshCcw, Trash2, X } from "lucide-react";
+import { CalendarDays, LayoutGrid, List, Pencil, Plus, RefreshCcw, Trash2, X } from "lucide-react";
 import { z } from "zod";
 
 import { PageHeader } from "@/components/common/page-header";
@@ -176,6 +176,8 @@ export default function ContratosPage() {
   const [pendingContract, setPendingContract] = useState<ContractRecord | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const clientsMap = useMemo(() => {
     const map = new Map<string, ClientRow>();
@@ -186,6 +188,21 @@ export default function ContratosPage() {
     });
     return map;
   }, [clients]);
+
+  const filteredContracts = useMemo(() => {
+    const normalized = searchTerm.trim().toLowerCase();
+    if (!normalized) return contracts;
+    return contracts.filter((contract) => {
+      const clientName =
+        contract.cliente?.nome ??
+        clientsMap.get(contract.cliente_id ?? "")?.nome ??
+        "";
+      return (
+        contract.numero_contrato.toLowerCase().includes(normalized) ||
+        clientName.toLowerCase().includes(normalized)
+      );
+    });
+  }, [contracts, searchTerm, clientsMap]);
 
   const loadContracts = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -456,16 +473,55 @@ export default function ContratosPage() {
               onClick={handleRefresh}
               disabled={loading || refreshing}
             >
-              <RefreshCcw className="mr-2 h-4 w-4" />
+              <RefreshCcw className="mr-2 size-4" />
               {refreshing ? "Atualizando..." : "Atualizar"}
             </Button>
             <Button onClick={openCreateForm} disabled={supabaseUnavailable}>
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 size-4" />
               Novo contrato
             </Button>
           </>
         }
       />
+
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="w-full md:max-w-md">
+          <label className="text-sm font-medium text-neutral-600">
+            Buscar por número ou cliente
+          </label>
+          <input
+            type="text"
+            placeholder="Ex.: CLT-2024-01 ou ACME Corp"
+            className="mt-2 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 focus:border-brand-500 focus:outline-none"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium text-neutral-600">Visualização</span>
+          <div className="flex rounded-lg border border-neutral-200 bg-white p-1">
+            <Button
+              type="button"
+              size="icon"
+              variant={viewMode === "cards" ? "default" : "ghost"}
+              onClick={() => setViewMode("cards")}
+              aria-pressed={viewMode === "cards"}
+            >
+              <LayoutGrid className="size-4" />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant={viewMode === "list" ? "default" : "ghost"}
+              onClick={() => setViewMode("list")}
+              aria-pressed={viewMode === "list"}
+            >
+              <List className="size-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
 
       <Card>
         {loading ? (
@@ -483,235 +539,242 @@ export default function ContratosPage() {
           <div className="flex h-48 flex-col items-center justify-center gap-3 text-center text-sm text-neutral-500">
             <p>Nenhum contrato cadastrado ainda.</p>
             <Button onClick={openCreateForm} disabled={supabaseUnavailable}>
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 size-4" />
               Cadastrar primeiro contrato
             </Button>
           </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-4 md:hidden">
-              {contracts.map((contract) => (
-                <Card key={`${contract.id}-card`} className="space-y-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-neutral-500">Contrato</p>
-                      <h3 className="text-lg font-semibold text-neutral-900">
-                        {contract.numero_contrato}
-                      </h3>
-                      <p className="text-xs text-neutral-500">{contract.id}</p>
-                    </div>
-                    <Tooltip.Provider delayDuration={150}>
-                      <div className="flex flex-col gap-2">
-                        <Tooltip.Root>
-                          <Tooltip.Trigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEditForm(contract)}
-                              aria-label={`Editar contrato ${contract.numero_contrato}`}
-                              disabled={supabaseUnavailable}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </Tooltip.Trigger>
-                          <Tooltip.Portal>
-                            <Tooltip.Content
-                              side="top"
-                              sideOffset={6}
-                              className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-                            >
-                              Editar contrato
-                              <Tooltip.Arrow className="fill-white" />
-                            </Tooltip.Content>
-                          </Tooltip.Portal>
-                        </Tooltip.Root>
-                        <Tooltip.Root>
-                          <Tooltip.Trigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-danger"
-                              onClick={() => openDeleteDialog(contract)}
-                              aria-label={`Excluir contrato ${contract.numero_contrato}`}
-                              disabled={supabaseUnavailable}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </Tooltip.Trigger>
-                          <Tooltip.Portal>
-                            <Tooltip.Content
-                              side="top"
-                              sideOffset={6}
-                              className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-                            >
-                              Excluir contrato
-                              <Tooltip.Arrow className="fill-white" />
-                            </Tooltip.Content>
-                          </Tooltip.Portal>
-                        </Tooltip.Root>
-                      </div>
-                    </Tooltip.Provider>
+        ) : filteredContracts.length === 0 ? (
+          <div className="flex h-32 flex-col items-center justify-center gap-2 text-center text-sm text-neutral-500">
+            <p>Nenhum contrato encontrado para o filtro informado.</p>
+            {searchTerm ? (
+              <Button variant="secondary" size="sm" onClick={() => setSearchTerm("")}>
+                Limpar busca
+              </Button>
+            ) : null}
+          </div>
+        ) : viewMode === "cards" ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            {filteredContracts.map((contract) => (
+              <Card key={`${contract.id}-card`} className="space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-neutral-500">Contrato</p>
+                    <h3 className="text-lg font-semibold text-neutral-900">
+                      {contract.numero_contrato}
+                    </h3>
+                    <p className="text-xs text-neutral-500">{contract.id}</p>
                   </div>
-                  <dl className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <dt className="text-neutral-500">Cliente</dt>
-                      <dd className="font-medium text-neutral-900">
-                        {contract.cliente?.nome ??
-                          clientsMap.get(contract.cliente_id ?? "")?.nome ??
-                          "Cliente não encontrado"}
-                      </dd>
+                  <Tooltip.Provider delayDuration={150}>
+                    <div className="flex flex-col gap-2">
+                      <Tooltip.Root>
+                        <Tooltip.Trigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditForm(contract)}
+                            aria-label={`Editar contrato ${contract.numero_contrato}`}
+                            disabled={supabaseUnavailable}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                        </Tooltip.Trigger>
+                        <Tooltip.Portal>
+                          <Tooltip.Content
+                            side="top"
+                            sideOffset={6}
+                            className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                          >
+                            Editar contrato
+                            <Tooltip.Arrow className="fill-white" />
+                          </Tooltip.Content>
+                        </Tooltip.Portal>
+                      </Tooltip.Root>
+                      <Tooltip.Root>
+                        <Tooltip.Trigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-danger"
+                            onClick={() => openDeleteDialog(contract)}
+                            aria-label={`Excluir contrato ${contract.numero_contrato}`}
+                            disabled={supabaseUnavailable}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </Tooltip.Trigger>
+                        <Tooltip.Portal>
+                          <Tooltip.Content
+                            side="top"
+                            sideOffset={6}
+                            className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                          >
+                            Excluir contrato
+                            <Tooltip.Arrow className="fill-white" />
+                          </Tooltip.Content>
+                        </Tooltip.Portal>
+                      </Tooltip.Root>
                     </div>
-                    <div>
-                      <dt className="text-neutral-500">Período</dt>
-                      <dd className="font-medium text-neutral-900">
-                        {formatDateRange(contract.data_inicio, contract.data_fim)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-neutral-500">Valor total</dt>
-                      <dd className="font-medium text-neutral-900">
-                        {formatCurrency(contract.valor_total)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-neutral-500">Comprometido</dt>
-                      <dd className="font-medium text-neutral-900">
-                        {formatCurrency(contract.valor_comprometido)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-neutral-500">Saldo disponível</dt>
-                      <dd className="font-semibold text-success">
-                        {formatCurrency(contract.valor_disponivel)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-neutral-500">Status</dt>
-                      <dd>
-                        <span
-                          className={clsx(
-                            "inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize",
-                            statusStyles[contract.status ?? ""] ??
-                              "bg-neutral-100 text-neutral-600"
-                          )}
-                        >
-                          {getStatusLabel(contract.status)}
-                        </span>
-                      </dd>
-                    </div>
-                  </dl>
-                </Card>
-              ))}
-            </div>
-
-            <div className="hidden overflow-x-auto md:block">
-              <table className="min-w-full divide-y divide-neutral-100 text-sm">
-                <thead>
-                  <tr className="text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                    <th className="px-3 py-3">Contrato</th>
-                    <th className="px-3 py-3">Cliente</th>
-                    <th className="px-3 py-3">Vigência</th>
-                    <th className="px-3 py-3">Valor total</th>
-                    <th className="px-3 py-3">Comprometido</th>
-                    <th className="px-3 py-3">Saldo disponível</th>
-                    <th className="px-3 py-3">Status</th>
-                    <th className="px-3 py-3 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100 text-neutral-700">
-                  {contracts.map((contract) => (
-                    <tr key={contract.id}>
-                      <td className="px-3 py-4">
-                        <div className="font-semibold text-neutral-900">
-                          {contract.numero_contrato}
+                  </Tooltip.Provider>
+                </div>
+                <dl className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <dt className="text-neutral-500">Cliente</dt>
+                    <dd className="font-medium text-neutral-900">
+                      {contract.cliente?.nome ??
+                        clientsMap.get(contract.cliente_id ?? "")?.nome ??
+                        "Cliente não encontrado"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-neutral-500">Período</dt>
+                    <dd className="font-medium text-neutral-900">
+                      {formatDateRange(contract.data_inicio, contract.data_fim)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-neutral-500">Valor total</dt>
+                    <dd className="font-medium text-neutral-900">
+                      {formatCurrency(contract.valor_total)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-neutral-500">Comprometido</dt>
+                    <dd className="font-medium text-neutral-900">
+                      {formatCurrency(contract.valor_comprometido)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-neutral-500">Saldo disponível</dt>
+                    <dd className="font-semibold text-success">
+                      {formatCurrency(contract.valor_disponivel)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-neutral-500">Status</dt>
+                    <dd>
+                      <span
+                        className={clsx(
+                          "inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize",
+                          statusStyles[contract.status ?? ""] ??
+                            "bg-neutral-100 text-neutral-600"
+                        )}
+                      >
+                        {getStatusLabel(contract.status)}
+                      </span>
+                    </dd>
+                  </div>
+                </dl>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-neutral-100 text-sm">
+              <thead>
+                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  <th className="px-3 py-3">Contrato</th>
+                  <th className="px-3 py-3">Cliente</th>
+                  <th className="px-3 py-3">Vigência</th>
+                  <th className="px-3 py-3">Valor total</th>
+                  <th className="px-3 py-3">Comprometido</th>
+                  <th className="px-3 py-3">Saldo disponível</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100 text-neutral-700">
+                {filteredContracts.map((contract) => (
+                  <tr key={contract.id}>
+                    <td className="px-3 py-4">
+                      <div className="font-semibold text-neutral-900">
+                        {contract.numero_contrato}
+                      </div>
+                      <p className="text-xs text-neutral-500">{contract.id}</p>
+                    </td>
+                    <td className="px-3 py-4">
+                      {contract.cliente?.nome ??
+                        clientsMap.get(contract.cliente_id ?? "")?.nome ??
+                        "Cliente não encontrado"}
+                    </td>
+                    <td className="px-3 py-4">
+                      {formatDateRange(contract.data_inicio, contract.data_fim)}
+                    </td>
+                    <td className="px-3 py-4 font-medium text-neutral-900">
+                      {formatCurrency(contract.valor_total)}
+                    </td>
+                    <td className="px-3 py-4 text-neutral-800">
+                      {formatCurrency(contract.valor_comprometido)}
+                    </td>
+                    <td className="px-3 py-4 font-semibold text-success">
+                      {formatCurrency(contract.valor_disponivel)}
+                    </td>
+                    <td className="px-3 py-4">
+                      <span
+                        className={clsx(
+                          "inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize",
+                          statusStyles[contract.status ?? ""] ?? "bg-neutral-100 text-neutral-600"
+                        )}
+                      >
+                        {getStatusLabel(contract.status)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-4 text-right">
+                      <Tooltip.Provider delayDuration={150}>
+                        <div className="flex flex-col items-end gap-1">
+                          <Tooltip.Root>
+                            <Tooltip.Trigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditForm(contract)}
+                                aria-label={`Editar contrato ${contract.numero_contrato}`}
+                                disabled={supabaseUnavailable}
+                              >
+                                <Pencil className="size-4" />
+                              </Button>
+                            </Tooltip.Trigger>
+                            <Tooltip.Portal>
+                              <Tooltip.Content
+                                side="top"
+                                sideOffset={6}
+                                className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                              >
+                                Editar contrato
+                                <Tooltip.Arrow className="fill-white" />
+                              </Tooltip.Content>
+                            </Tooltip.Portal>
+                          </Tooltip.Root>
+                          <Tooltip.Root>
+                            <Tooltip.Trigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-danger"
+                                onClick={() => openDeleteDialog(contract)}
+                                aria-label={`Excluir contrato ${contract.numero_contrato}`}
+                                disabled={supabaseUnavailable}
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </Tooltip.Trigger>
+                            <Tooltip.Portal>
+                              <Tooltip.Content
+                                side="top"
+                                sideOffset={6}
+                                className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                              >
+                                Excluir contrato
+                                <Tooltip.Arrow className="fill-white" />
+                              </Tooltip.Content>
+                            </Tooltip.Portal>
+                          </Tooltip.Root>
                         </div>
-                        <p className="text-xs text-neutral-500">{contract.id}</p>
-                      </td>
-                      <td className="px-3 py-4">
-                        {contract.cliente?.nome ??
-                          clientsMap.get(contract.cliente_id ?? "")?.nome ??
-                          "Cliente não encontrado"}
-                      </td>
-                      <td className="px-3 py-4">
-                        {formatDateRange(contract.data_inicio, contract.data_fim)}
-                      </td>
-                      <td className="px-3 py-4 font-medium text-neutral-900">
-                        {formatCurrency(contract.valor_total)}
-                      </td>
-                      <td className="px-3 py-4 text-neutral-800">
-                        {formatCurrency(contract.valor_comprometido)}
-                      </td>
-                      <td className="px-3 py-4 font-semibold text-success">
-                        {formatCurrency(contract.valor_disponivel)}
-                      </td>
-                      <td className="px-3 py-4">
-                        <span
-                          className={clsx(
-                            "inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize",
-                            statusStyles[contract.status ?? ""] ?? "bg-neutral-100 text-neutral-600"
-                          )}
-                        >
-                          {getStatusLabel(contract.status)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-4 text-right">
-                        <Tooltip.Provider delayDuration={150}>
-                          <div className="flex flex-col items-end gap-1">
-                            <Tooltip.Root>
-                              <Tooltip.Trigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => openEditForm(contract)}
-                                  aria-label={`Editar contrato ${contract.numero_contrato}`}
-                                  disabled={supabaseUnavailable}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              </Tooltip.Trigger>
-                              <Tooltip.Portal>
-                                <Tooltip.Content
-                                  side="top"
-                                  sideOffset={6}
-                                  className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-                                >
-                                  Editar contrato
-                                  <Tooltip.Arrow className="fill-white" />
-                                </Tooltip.Content>
-                              </Tooltip.Portal>
-                            </Tooltip.Root>
-                            <Tooltip.Root>
-                              <Tooltip.Trigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-danger"
-                                  onClick={() => openDeleteDialog(contract)}
-                                  aria-label={`Excluir contrato ${contract.numero_contrato}`}
-                                  disabled={supabaseUnavailable}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </Tooltip.Trigger>
-                              <Tooltip.Portal>
-                                <Tooltip.Content
-                                  side="top"
-                                  sideOffset={6}
-                                  className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-                                >
-                                  Excluir contrato
-                                  <Tooltip.Arrow className="fill-white" />
-                                </Tooltip.Content>
-                              </Tooltip.Portal>
-                            </Tooltip.Root>
-                          </div>
-                        </Tooltip.Provider>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </Tooltip.Provider>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </Card>
@@ -726,7 +789,7 @@ export default function ContratosPage() {
               </Dialog.Title>
               <Dialog.Close asChild>
                 <Button variant="ghost" size="icon" aria-label="Fechar formulário">
-                  <X className="h-4 w-4" />
+                    <X className="size-4" />
                 </Button>
               </Dialog.Close>
             </div>
@@ -809,7 +872,7 @@ export default function ContratosPage() {
                       onChange={handleFormChange}
                       className={clsx(inputClassName(Boolean(formErrors.data_inicio)), "pr-10")}
                     />
-                    <CalendarDays className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                    <CalendarDays className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
                   </div>
                   {formErrors.data_inicio ? (
                     <p className="text-xs text-danger">{formErrors.data_inicio}</p>
@@ -829,7 +892,7 @@ export default function ContratosPage() {
                       onChange={handleFormChange}
                       className={clsx(inputClassName(Boolean(formErrors.data_fim)), "pr-10")}
                     />
-                    <CalendarDays className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                    <CalendarDays className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
                   </div>
                   {formErrors.data_fim ? (
                     <p className="text-xs text-danger">{formErrors.data_fim}</p>
@@ -948,7 +1011,7 @@ export default function ContratosPage() {
               </Dialog.Title>
               <Dialog.Close asChild>
                 <Button variant="ghost" size="icon" aria-label="Fechar confirmação">
-                  <X className="h-4 w-4" />
+                <X className="size-4" />
                 </Button>
               </Dialog.Close>
             </div>
