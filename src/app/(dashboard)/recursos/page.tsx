@@ -134,6 +134,24 @@ function inputClassName(hasError?: boolean) {
   );
 }
 
+function tabButtonClassName(isActive: boolean) {
+  return clsx(
+    "rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition-colors",
+    isActive
+      ? "bg-brand-50 hover:bg-brand-100 !text-brand-700 ring-1 ring-brand-200"
+      : "text-neutral-600 hover:bg-white hover:text-neutral-900"
+  );
+}
+
+function viewToggleClassName(isActive: boolean) {
+  return clsx(
+    "rounded-lg transition-colors",
+    isActive
+      ? "bg-brand-50 text-brand-700 ring-1 ring-brand-200"
+      : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+  );
+}
+
 export default function RecursosPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
@@ -602,10 +620,11 @@ export default function RecursosPage() {
         }
       />
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2 rounded-full border border-neutral-50 bg-neutral-50 p-1">
         <Button
           type="button"
-          variant={activeTab === "resources" ? "default" : "outline"}
+          variant="ghost"
+          className={tabButtonClassName(activeTab === "resources")}
           onClick={() => setActiveTab("resources")}
           aria-pressed={activeTab === "resources"}
         >
@@ -613,7 +632,8 @@ export default function RecursosPage() {
         </Button>
         <Button
           type="button"
-          variant={activeTab === "profiles" ? "default" : "outline"}
+          variant="ghost"
+          className={tabButtonClassName(activeTab === "profiles")}
           onClick={() => setActiveTab("profiles")}
           aria-pressed={activeTab === "profiles"}
         >
@@ -665,7 +685,8 @@ export default function RecursosPage() {
                   <Button
                     type="button"
                     size="icon"
-                    variant={viewMode === "cards" ? "default" : "ghost"}
+                    variant="ghost"
+                    className={viewToggleClassName(viewMode === "cards")}
                     onClick={() => setViewMode("cards")}
                     aria-pressed={viewMode === "cards"}
                   >
@@ -674,7 +695,8 @@ export default function RecursosPage() {
                   <Button
                     type="button"
                     size="icon"
-                    variant={viewMode === "list" ? "default" : "ghost"}
+                    variant="ghost"
+                    className={viewToggleClassName(viewMode === "list")}
                     onClick={() => setViewMode("list")}
                     aria-pressed={viewMode === "list"}
                   >

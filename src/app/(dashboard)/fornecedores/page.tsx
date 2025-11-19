@@ -700,11 +700,8 @@ export default function ContratosFornecedorPage() {
         actions={
 
           <Button onClick={openCreateForm}>
-
             <Plus className="mr-2 size-4" />
-
-            Novo contrato fornecedor
-
+            Novo contrato
           </Button>
 
         }
@@ -1597,77 +1594,47 @@ export default function ContratosFornecedorPage() {
       </Dialog.Root>
 
       <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
-
         <Dialog.Portal>
-
           <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
-
           <Dialog.Content className="fixed inset-0 flex items-center justify-center p-4">
-
             <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-
               <Dialog.Title className="text-lg font-semibold text-neutral-900">
-
-                Confirmar exclusão
-
+                Excluir contrato
               </Dialog.Title>
-
               <Dialog.Description className="mt-2 text-sm text-neutral-600">
-
-                Tem certeza que deseja excluir o contrato {pendingContract?.numero_contrato} ? Essa ação não pode ser desfeita.
-
+                Confirma a exclusão do contrato{" "}
+                <span className="font-semibold text-neutral-800">
+                 {pendingContract?.numero_contrato} 
+                 </span>{" "} ? 
+                <p>Essa ação não pode ser desfeita.</p>
               </Dialog.Description>
 
               {deleteError ? (
-
                 <div className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
-
                   {deleteError}
-
                 </div>
-
               ) : null}
 
               <div className="mt-6 flex justify-end gap-3">
-
                 <Dialog.Close asChild>
-
                   <Button variant="outline" type="button" onClick={() => setPendingContract(null)}>
-
                     Cancelar
-
                   </Button>
-
                 </Dialog.Close>
-
                 <Button
-
                   variant="destructive"
-
                   type="button"
-
                   onClick={handleDelete}
-
-                  disabled={deleteLoading}
-
+                  disabled={deleteLoading || !pendingContract}
                 >
-
                   {deleteLoading ? "Excluindo..." : "Excluir"}
-
                 </Button>
-
               </div>
-
             </div>
-
           </Dialog.Content>
-
         </Dialog.Portal>
-
       </Dialog.Root>
-
     </div>
-
   );
 
 }

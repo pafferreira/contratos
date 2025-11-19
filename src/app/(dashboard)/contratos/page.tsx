@@ -464,7 +464,7 @@ export default function ContratosPage() {
     <div className="space-y-6">
       <PageHeader
         title="Contratos do Cliente"
-        subtitle="Inventário oficial de contratos. Os nomes seguem a convenção do Supabase."
+        subtitle="Gerencie contratos, vigências e valores negociados com clientes."
         actions={
           <>
             <Button
@@ -1020,8 +1020,7 @@ export default function ContratosPage() {
               <span className="font-semibold text-neutral-800">
                 {pendingContract?.numero_contrato}
               </span>{" "} ?  
-               Essa ação não pode ser desfeita.
-              
+               <p>Essa ação não pode ser desfeita.</p>
             </Dialog.Description>
 
             {deleteError ? (
