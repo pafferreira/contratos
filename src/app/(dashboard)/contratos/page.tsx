@@ -122,7 +122,7 @@ function formatCurrency(value?: number | null) {
 }
 
 function formatDateRange(start?: string | null, end?: string | null) {
-  if (!start || !end) return "Período não informado";
+  if (!start || !end) return "Vigência não informada";
   try {
     return `${format(parseISO(start), "dd/MM/yyyy")} – ${format(parseISO(end), "dd/MM/yyyy")}`;
   } catch {
@@ -626,7 +626,7 @@ export default function ContratosPage() {
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-neutral-500">Período</dt>
+                    <dt className="text-neutral-500">Vigência</dt>
                     <dd className="font-medium text-neutral-900">
                       {formatDateRange(contract.data_inicio, contract.data_fim)}
                     </dd>
