@@ -48,7 +48,7 @@ export default function DashboardPage() {
                   {card.helper}
                 </p>
               </div>
-              <card.icon className="h-8 w-8 text-brand-500" />
+              <card.icon className="size-8 text-brand-500" />
             </div>
           </Card>
         ))}

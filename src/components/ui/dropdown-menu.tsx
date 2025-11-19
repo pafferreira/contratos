@@ -21,14 +21,14 @@ const DropdownMenuSubTrigger = forwardRef<
   <DropdownMenuPrimitive.SubTrigger
     ref={ref}
     className={clsx(
-      "flex cursor-pointer select-none items-center rounded-md px-2 py-2 text-sm text-neutral-700 outline-none data-[highlighted]:bg-neutral-100",
+      "flex cursor-pointer select-none items-center rounded-md p-2 text-sm text-neutral-700 outline-none data-[highlighted]:bg-neutral-100",
       inset && "pl-8",
       className
     )}
     {...props}
   >
     {children}
-    <ChevronRight className="ml-auto h-4 w-4" />
+    <ChevronRight className="ml-auto size-4" />
   </DropdownMenuPrimitive.SubTrigger>
 ));
 DropdownMenuSubTrigger.displayName = DropdownMenuPrimitive.SubTrigger.displayName;
@@ -75,7 +75,9 @@ const DropdownMenuItem = forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={clsx(
-      "relative flex cursor-pointer select-none items-center rounded-md px-2 py-2 text-sm text-neutral-700 outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-neutral-100",
+      "relative flex cursor-pointer select-none items-center rounded-md p-2 text-sm text-neutral-700 outline-none",
+      "data-[highlighted]:bg-neutral-100",
+      "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       inset && "pl-8",
       className
     )}
@@ -91,15 +93,17 @@ const DropdownMenuCheckboxItem = forwardRef<
   <DropdownMenuPrimitive.CheckboxItem
     ref={ref}
     className={clsx(
-      "relative flex cursor-pointer select-none items-center rounded-md px-2 py-2 text-sm text-neutral-700 outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-neutral-100",
+      "relative flex cursor-pointer select-none items-center rounded-md p-2 text-sm text-neutral-700 outline-none",
+      "data-[highlighted]:bg-neutral-100",
+      "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className
     )}
     checked={checked}
     {...props}
   >
-    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+    <span className="absolute left-2 flex size-3.5 items-center justify-center">
       <DropdownMenuPrimitive.ItemIndicator>
-        <Check className="h-4 w-4" />
+        <Check className="size-4" />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
     {children}

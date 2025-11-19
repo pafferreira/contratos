@@ -320,6 +320,10 @@ export default function ContratosFornecedorPage() {
   }, [suppliers]);
 
   const loadSuppliers = useCallback(async () => {
+    if (!supabase) {
+      setError("Supabase não configurado.");
+      return [];
+    }
 
     const { data, error: fetchError } = await supabase
 
@@ -348,6 +352,14 @@ export default function ContratosFornecedorPage() {
   const loadContracts = useCallback(
 
     async (options?: { silent?: boolean }) => {
+
+      if (!supabase) {
+        setError("Supabase não configurado.");
+        setContracts([]);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
 
       if (!options?.silent) {
 
@@ -484,8 +496,6 @@ export default function ContratosFornecedorPage() {
 
       valor_comprometido_display: formatCurrencyDisplayFromNumber(contract.valor_comprometido),
 
-      valor_comprometido_display: formatCurrencyDisplayFromNumber(contract.valor_comprometido),
-
       status: contract.status ?? "rascunho",
 
     });
@@ -594,6 +604,13 @@ export default function ContratosFornecedorPage() {
 
     setError(null);
 
+    if (!supabase) {
+      setFormErrors({
+        general: "Supabase não configurado. Verifique as variáveis de ambiente."
+      });
+      return;
+    }
+
     const query = supabase.from(CONTRACTS_TABLE);
 
     const response = formMode === "edit" && activeContractId
@@ -631,6 +648,12 @@ export default function ContratosFornecedorPage() {
     setDeleteLoading(true);
 
     setDeleteError(null);
+
+    if (!supabase) {
+      setDeleteLoading(false);
+      setDeleteError("Supabase não configurado.");
+      return;
+    }
 
     const { error: deleteErr } = await supabase
 
@@ -738,7 +761,7 @@ export default function ContratosFornecedorPage() {
 
                 size="icon"
 
-                variant={viewMode === "cards" ? "default" : "ghost"}
+                variant={viewMode === "cards" ? "primary" : "ghost"}
 
                 onClick={() => setViewMode("cards")}
 
@@ -756,7 +779,7 @@ export default function ContratosFornecedorPage() {
 
                 size="icon"
 
-                variant={viewMode === "list" ? "default" : "ghost"}
+                variant={viewMode === "list" ? "primary" : "ghost"}
 
                 onClick={() => setViewMode("list")}
 

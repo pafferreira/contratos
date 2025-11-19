@@ -672,14 +672,14 @@ export default function ContratosPage() {
             <table className="min-w-full divide-y divide-neutral-100 text-sm">
               <thead>
                 <tr className="text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  <th className="px-3 py-3">Contrato</th>
-                  <th className="px-3 py-3">Cliente</th>
-                  <th className="px-3 py-3">Vigência</th>
-                  <th className="px-3 py-3">Valor total</th>
-                  <th className="px-3 py-3">Comprometido</th>
-                  <th className="px-3 py-3">Saldo disponível</th>
-                  <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3 text-right">Ações</th>
+                  <th className="p-3">Contrato</th>
+                  <th className="p-3">Cliente</th>
+                  <th className="p-3">Vigência</th>
+                  <th className="p-3">Valor total</th>
+                  <th className="p-3">Comprometido</th>
+                  <th className="p-3">Saldo disponível</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 text-neutral-700">

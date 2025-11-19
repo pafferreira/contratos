@@ -6,7 +6,7 @@ import { type VariantProps, cva } from "class-variance-authority";
 import clsx from "clsx";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-colors hocus:outline-none hocus:ring-2 hocus:ring-brand-200 hocus:ring-offset-2 disabled:pointer-events-none disabled:opacity-60",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-60 hocus:outline-none hocus:ring-2 hocus:ring-brand-200 hocus:ring-offset-2",
   {
     variants: {
       variant: {
@@ -21,7 +21,7 @@ const buttonVariants = cva(
         sm: "h-9 px-3",
         md: "h-10 px-4",
         lg: "h-11 px-6",
-        icon: "h-9 w-9"
+        icon: "size-9"
       }
     },
     defaultVariants: {

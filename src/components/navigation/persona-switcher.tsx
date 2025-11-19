@@ -38,7 +38,7 @@ export function PersonaSwitcher() {
         {PERSONAS.map((option) => (
           <DropdownMenuItem
             key={option.value}
-            className="cursor-pointer rounded-md px-2 py-2 text-sm text-neutral-700 outline-none data-[highlighted]:bg-neutral-100"
+            className="cursor-pointer rounded-md p-2 text-sm text-neutral-700 outline-none data-[highlighted]:bg-neutral-100"
             onSelect={() => setPersona(option)}
           >
             {option.label}
