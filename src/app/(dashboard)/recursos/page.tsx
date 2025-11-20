@@ -23,6 +23,11 @@ type ResourceRecord = ResourceRow & {
   perfil?: Pick<ProfileRow, "id" | "nome" | "valor_hora"> | null;
 };
 
+type SupabaseResourceQueryResult = ResourceRow & {
+  fornecedor: { id: SupplierRow["id"]; nome: SupplierRow["nome"] }[] | null;
+  perfil: { id: ProfileRow["id"]; nome: ProfileRow["nome"]; valor_hora: ProfileRow["valor_hora"] }[] | null;
+};
+
 type ResourceFormState = {
   nome_completo: string;
   email: string;
@@ -87,7 +92,7 @@ const ProfileFormSchema = z.object({
     .string()
     .optional()
     .or(z.literal(""))
-    .transform((value) => value.trim()),
+    .transform((value = "") => value.trim()),
   valor_hora: z
     .string()
     .trim()
@@ -138,8 +143,8 @@ function tabButtonClassName(isActive: boolean) {
   return clsx(
     "rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition-colors",
     isActive
-      ? "bg-brand-50 hover:bg-brand-100 !text-brand-700 ring-1 ring-brand-200"
-      : "text-neutral-600 hover:bg-white hover:text-neutral-900"
+      ? "bg-brand-50 hover:bg-brand-100 ring-1 ring-brand-200 !text-brand-700"
+      : "text-neutral-600 hover:text-neutral-900 hover:bg-white"
   );
 }
 
@@ -216,6 +221,11 @@ export default function RecursosPage() {
   }, [profiles]);
 
   const loadSuppliers = useCallback(async () => {
+    if (!supabase) {
+      setError("Supabase não configurado. Verifique as variáveis de ambiente.");
+      setSuppliers([]);
+      return [];
+    }
     const { data, error: fetchError } = await supabase
       .from(SUPPLIERS_TABLE)
       .select("id, nome")
@@ -233,6 +243,11 @@ export default function RecursosPage() {
 
   const loadProfiles = useCallback(
     async (options?: { silent?: boolean }) => {
+      if (!supabase) {
+        setProfileError("Supabase não configurado. Verifique as variáveis de ambiente.");
+        setProfileLoading(false);
+        return [];
+      }
       if (!options?.silent) {
         setProfileLoading(true);
       }
@@ -259,6 +274,13 @@ export default function RecursosPage() {
 
   const loadResources = useCallback(
     async (options?: { silent?: boolean }) => {
+      if (!supabase) {
+        setError("Supabase não configurado. Verifique as variáveis de ambiente.");
+        setResources([]);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
       if (!options?.silent) {
         setLoading(true);
       }
@@ -279,7 +301,15 @@ export default function RecursosPage() {
       }
 
       setError(null);
-      setResources((data || []) as ResourceRecord[]);
+      const normalizedResources: ResourceRecord[] = (data || []).map((resource) => {
+        const { fornecedor, perfil, ...rest } = resource as SupabaseResourceQueryResult;
+        return {
+          ...rest,
+          fornecedor: fornecedor?.[0] ?? null,
+          perfil: perfil?.[0] ?? null
+        };
+      });
+      setResources(normalizedResources);
       setLoading(false);
       setRefreshing(false);
     },
@@ -465,6 +495,13 @@ export default function RecursosPage() {
       return;
     }
 
+    if (!supabase) {
+      setFormErrors({
+        general: "Supabase não configurado. Verifique as variáveis de ambiente."
+      });
+      return;
+    }
+
     const payload = {
       nome_completo: parsed.data.nome_completo,
       email: parsed.data.email,
@@ -475,6 +512,14 @@ export default function RecursosPage() {
 
     setSubmitting(true);
     setError(null);
+
+    if (!supabase) {
+      setFormErrors({
+        general: "Supabase não configurado. Verifique as variáveis de ambiente."
+      });
+      setSubmitting(false);
+      return;
+    }
 
     const query = supabase.from(RESOURCES_TABLE);
     const response =
@@ -500,6 +545,10 @@ export default function RecursosPage() {
 
   const handleDelete = async () => {
     if (!pendingResource?.id) return;
+    if (!supabase) {
+      setDeleteError("Supabase não configurado. Verifique as variáveis de ambiente.");
+      return;
+    }
 
     setDeleteLoading(true);
     setDeleteError(null);
@@ -524,6 +573,13 @@ export default function RecursosPage() {
   const handleProfileSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setProfileFormErrors({});
+
+    if (!supabase) {
+      setProfileFormErrors({
+        general: "Supabase não configurado. Verifique as variáveis de ambiente."
+      });
+      return;
+    }
 
     const parsed = ProfileFormSchema.safeParse(profileFormState);
     if (!parsed.success) {
@@ -571,6 +627,10 @@ export default function RecursosPage() {
 
   const handleProfileDelete = async () => {
     if (!pendingProfile?.id) return;
+    if (!supabase) {
+      setProfileDeleteError("Supabase não configurado. Verifique as variáveis de ambiente.");
+      return;
+    }
 
     setProfileDeleteLoading(true);
     setProfileDeleteError(null);

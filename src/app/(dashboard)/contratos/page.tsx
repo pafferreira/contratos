@@ -19,7 +19,12 @@ type ContractRow = TablesRow<Database["public"]["Tables"]["C_CONTRATOS_CLIENTE"]
 type ClientRow = TablesRow<Database["public"]["Tables"]["C_CLIENTES"]>;
 
 type ContractRecord = ContractRow & {
+  status?: string | null;
   cliente?: Pick<ClientRow, "id" | "nome"> | null;
+};
+
+type SupabaseContractQueryResult = ContractRow & {
+  cliente: { id: ClientRow["id"]; nome: ClientRow["nome"] }[] | null;
 };
 
 type ContractFormState = {
@@ -230,7 +235,7 @@ export default function ContratosPage() {
             "id, cliente_id, numero_contrato, data_inicio, data_fim, valor_total, valor_comprometido, valor_disponivel, status, cliente:C_CLIENTES (id, nome)"
           )
           .order("data_inicio", { ascending: false }),
-        supabase.from(CLIENTS_TABLE).select("id, nome").order("nome")
+        supabase.from(CLIENTS_TABLE).select("id, nome, documento, criado_em").order("nome")
       ]);
 
       if (contractError || clientError) {
@@ -244,7 +249,12 @@ export default function ContratosPage() {
             "Não foi possível carregar os contratos. Verifique se os nomes das tabelas coincidem com o Supabase."
         );
       } else {
-        setContracts((contractData ?? []) as ContractRecord[]);
+        const normalizedContracts: ContractRecord[] = (contractData ?? []).map((contract) => {
+          const { cliente, ...rest } = contract as SupabaseContractQueryResult;
+          // Supabase retorna arrays em relacionamentos; pegamos o primeiro item
+          return { ...rest, cliente: cliente?.[0] ?? null };
+        });
+        setContracts(normalizedContracts);
         setClients(clientData ?? []);
       }
 
@@ -349,12 +359,11 @@ export default function ContratosPage() {
 
     const parsed = ContractFormSchema.safeParse(formState);
     if (!parsed.success) {
-      const fieldErrors = parsed.error.flatten().fieldErrors;
+      const fieldErrors = parsed.error.flatten().fieldErrors as Record<string, string[]>;
       const formattedErrors: FormErrors = {};
-      (Object.keys(fieldErrors) as (keyof ContractFormState)[]).forEach((field) => {
-        const fieldError = fieldErrors[field];
+      Object.entries(fieldErrors).forEach(([field, fieldError]) => {
         if (fieldError?.length) {
-          formattedErrors[field] = fieldError[0];
+          formattedErrors[field as keyof ContractFormState] = fieldError[0];
         }
       });
       setFormErrors(formattedErrors);
@@ -504,7 +513,7 @@ export default function ContratosPage() {
             <Button
               type="button"
               size="icon"
-              variant={viewMode === "cards" ? "default" : "ghost"}
+              variant={viewMode === "cards" ? "secondary" : "ghost"}
               onClick={() => setViewMode("cards")}
               aria-pressed={viewMode === "cards"}
             >
@@ -513,7 +522,7 @@ export default function ContratosPage() {
             <Button
               type="button"
               size="icon"
-              variant={viewMode === "list" ? "default" : "ghost"}
+              variant={viewMode === "list" ? "secondary" : "ghost"}
               onClick={() => setViewMode("list")}
               aria-pressed={viewMode === "list"}
             >

@@ -18,6 +18,11 @@ export default function SignInPage() {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
+    if (!supabase) {
+      setMessage("Configuração do Supabase ausente. Contate o administrador.");
+      setLoading(false);
+      return;
+    }
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
