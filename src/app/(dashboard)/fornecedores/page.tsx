@@ -35,6 +35,15 @@ type SupplierContractRecord = SupplierContractRow & {
 
 };
 
+type SupplierFormState = {
+  id?: string;
+  nome: string;
+  documento: string;
+  email_contato: string;
+};
+
+type SupplierFormErrors = Partial<Record<keyof SupplierFormState | "general", string>>;
+
 type ContractFormState = {
 
   fornecedor_id: string;
@@ -115,6 +124,12 @@ const EMPTY_FORM_STATE: ContractFormState = {
 
 };
 
+const EMPTY_SUPPLIER_FORM_STATE: SupplierFormState = {
+  nome: "",
+  documento: "",
+  email_contato: ""
+};
+
 const ContractFormSchema = z
 
   .object({
@@ -191,6 +206,23 @@ const ContractFormSchema = z
     }
 
   );
+
+const SupplierFormSchema = z.object({
+  nome: z.string().trim().min(1, "Informe o nome do fornecedor"),
+  documento: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .transform((value = "") => value),
+  email_contato: z
+    .string()
+    .trim()
+    .email("Informe um email válido")
+    .optional()
+    .or(z.literal(""))
+    .transform((value = "") => value)
+});
 
 function formatCurrency(value?: number | null) {
 
@@ -300,6 +332,21 @@ export default function ContratosFornecedorPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
+  const [activeTab, setActiveTab] = useState<"contracts" | "suppliers">("contracts");
+  const [supplierSearchTerm, setSupplierSearchTerm] = useState("");
+  const [suppliersLoading, setSuppliersLoading] = useState(true);
+  const [suppliersRefreshing, setSuppliersRefreshing] = useState(false);
+  const [supplierFormOpen, setSupplierFormOpen] = useState(false);
+  const [supplierFormMode, setSupplierFormMode] = useState<"create" | "edit">("create");
+  const [supplierFormState, setSupplierFormState] = useState<SupplierFormState>({
+    ...EMPTY_SUPPLIER_FORM_STATE
+  });
+  const [supplierFormErrors, setSupplierFormErrors] = useState<SupplierFormErrors>({});
+  const [supplierSubmitting, setSupplierSubmitting] = useState(false);
+  const [supplierDeleteOpen, setSupplierDeleteOpen] = useState(false);
+  const [pendingSupplier, setPendingSupplier] = useState<SupplierRow | null>(null);
+  const [supplierDeleteError, setSupplierDeleteError] = useState<string | null>(null);
+  const [supplierDeleteLoading, setSupplierDeleteLoading] = useState(false);
 
   const suppliersMap = useMemo(() => {
 
@@ -319,35 +366,35 @@ export default function ContratosFornecedorPage() {
 
   }, [suppliers]);
 
-  const loadSuppliers = useCallback(async () => {
-    if (!supabase) {
-      setError("Supabase não configurado.");
-      return [];
-    }
+  const loadSuppliers = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!supabase) {
+        setError("Supabase não configurado.");
+        setSuppliers([]);
+        setSuppliersLoading(false);
+        setSuppliersRefreshing(false);
+        return [];
+      }
 
-    const { data, error: fetchError } = await supabase
+      options?.silent ? setSuppliersRefreshing(true) : setSuppliersLoading(true);
+      const { data, error: fetchError } = await supabase
+        .from(SUPPLIERS_TABLE)
+        .select("id, nome, documento, email_contato")
+        .order("nome", { ascending: true });
 
-      .from(SUPPLIERS_TABLE)
+      if (fetchError) {
+        setError("Erro ao carregar fornecedores.");
+        options?.silent ? setSuppliersRefreshing(false) : setSuppliersLoading(false);
+        return [];
+      }
 
-      .select("id, nome")
-
-      .order("nome", { ascending: true });
-
-    if (fetchError) {
-
-      setError("Erro ao carregar fornecedores.");
-
-      return [];
-
-    }
-
-    const rows = (data || []) as SupplierRow[];
-
-    setSuppliers(rows);
-
-    return rows;
-
-  }, [supabase]);
+      const rows = (data || []) as SupplierRow[];
+      setSuppliers(rows);
+      options?.silent ? setSuppliersRefreshing(false) : setSuppliersLoading(false);
+      return rows;
+    },
+    [supabase]
+  );
 
   const loadContracts = useCallback(
 
@@ -429,11 +476,23 @@ export default function ContratosFornecedorPage() {
 
   }, [contracts, searchTerm]);
 
+  const filteredSuppliers = useMemo(() => {
+    const normalized = supplierSearchTerm.trim().toLowerCase();
+    if (!normalized) return suppliers;
+    return suppliers.filter((supplier) => {
+      return (
+        supplier.nome?.toLowerCase().includes(normalized) ||
+        (supplier.documento ?? "").toLowerCase().includes(normalized) ||
+        (supplier.email_contato ?? "").toLowerCase().includes(normalized)
+      );
+    });
+  }, [suppliers, supplierSearchTerm]);
+
   const handleRefresh = async () => {
 
     setRefreshing(true);
 
-    await Promise.all([loadSuppliers(), loadContracts({ silent: true })]);
+    await Promise.all([loadSuppliers({ silent: true }), loadContracts({ silent: true })]);
 
     setRefreshing(false);
 
@@ -641,6 +700,127 @@ export default function ContratosFornecedorPage() {
 
   };
 
+  const resetSupplierForm = useCallback(() => {
+    setSupplierFormState({ ...EMPTY_SUPPLIER_FORM_STATE });
+    setSupplierFormErrors({});
+    setSupplierFormMode("create");
+    setPendingSupplier(null);
+  }, []);
+
+  const handleSupplierFormDialogChange = (open: boolean) => {
+    if (!open) {
+      setSupplierFormOpen(false);
+      resetSupplierForm();
+      setSupplierSubmitting(false);
+    } else {
+      setSupplierFormOpen(true);
+    }
+  };
+
+  const openCreateSupplierForm = () => {
+    resetSupplierForm();
+    setSupplierFormMode("create");
+    setSupplierFormOpen(true);
+  };
+
+  const openEditSupplierForm = (supplier: SupplierRow) => {
+    setSupplierFormMode("edit");
+    setSupplierFormState({
+      id: supplier.id,
+      nome: supplier.nome ?? "",
+      documento: supplier.documento ?? "",
+      email_contato: supplier.email_contato ?? ""
+    });
+    setSupplierFormErrors({});
+    setSupplierFormOpen(true);
+  };
+
+  const handleSupplierInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    setSupplierFormState((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSupplierSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSupplierFormErrors({});
+
+    if (!supabase) {
+      setSupplierFormErrors({
+        general: "Supabase não configurado. Verifique as variáveis de ambiente."
+      });
+      return;
+    }
+
+    const parsed = SupplierFormSchema.safeParse(supplierFormState);
+    if (!parsed.success) {
+      const fieldErrors = parsed.error.flatten().fieldErrors;
+      const formatted: SupplierFormErrors = {};
+      Object.entries(fieldErrors).forEach(([field, messages]) => {
+        if (messages?.length) {
+          formatted[field as keyof SupplierFormState] = messages[0] ?? "Campo obrigatório";
+        }
+      });
+      setSupplierFormErrors(formatted);
+      return;
+    }
+
+    const payload = {
+      nome: parsed.data.nome.trim(),
+      documento: parsed.data.documento?.trim() ? parsed.data.documento.trim() : null,
+      email_contato: parsed.data.email_contato?.trim() ? parsed.data.email_contato.trim() : null
+    };
+
+    setSupplierSubmitting(true);
+    const query = supabase.from(SUPPLIERS_TABLE);
+    const response =
+      supplierFormMode === "edit" && supplierFormState.id
+        ? await query.update(payload).eq("id", supplierFormState.id)
+        : await query.insert(payload);
+    setSupplierSubmitting(false);
+
+    if (response.error) {
+      setSupplierFormErrors({
+        general: response.error.message ?? "Não foi possível salvar o fornecedor."
+      });
+      return;
+    }
+
+    resetSupplierForm();
+    setSupplierFormOpen(false);
+    await loadSuppliers({ silent: true });
+    await loadContracts({ silent: true });
+  };
+
+  const openDeleteSupplierDialog = (supplier: SupplierRow) => {
+    setPendingSupplier(supplier);
+    setSupplierDeleteError(null);
+    setSupplierDeleteOpen(true);
+  };
+
+  const handleSupplierDelete = async () => {
+    if (!pendingSupplier?.id) return;
+    if (!supabase) {
+      setSupplierDeleteError("Supabase não configurado. Verifique as variáveis de ambiente.");
+      return;
+    }
+    setSupplierDeleteLoading(true);
+    const { error: deleteErr } = await supabase
+      .from(SUPPLIERS_TABLE)
+      .delete()
+      .eq("id", pendingSupplier.id);
+    setSupplierDeleteLoading(false);
+    if (deleteErr) {
+      setSupplierDeleteError(
+        deleteErr.message ?? "Não foi possível excluir o fornecedor. Verifique vínculos existentes."
+      );
+      return;
+    }
+    setSupplierDeleteOpen(false);
+    setPendingSupplier(null);
+    await loadSuppliers({ silent: true });
+    await loadContracts({ silent: true });
+  };
+
   const handleDelete = async () => {
 
     if (!pendingContract?.id) return;
@@ -686,139 +866,32 @@ export default function ContratosFornecedorPage() {
   const supplierSelectDisabled = suppliers.length === 0;
 
   const submitDisabled = submitting || (supplierSelectDisabled && isCreateMode);
+  const supplierModeIsCreate = supplierFormMode === "create";
+  const supabaseUnavailable = supabase === null;
 
-  return (
-
-    <div className="space-y-6">
-
-      <PageHeader
-
-        title="Contratos de Fornecedor"
-        subtitle="Gerencie contratos, vigências e valores negociados com fornecedores."
-
-        actions={
-          <Button onClick={openCreateForm}>
-            <Plus className="mr-2 size-4" />
-            Novo contrato
-          </Button>
-        }
-
-      />
-
-      {error ? (
-
-        <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-
-          {error}
-
-        </div>
-
-      ) : null}
-
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-
-        <div className="w-full md:max-w-md">
-
-          <label className="text-sm font-medium text-neutral-600">
-
-            Buscar por número ou fornecedor
-
-          </label>
-
-          <input
-
-            type="text"
-
-            placeholder="Ex.: FORN-2024-08 ou Tech Experts"
-
-            className="mt-2 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 focus:border-brand-500 focus:outline-none"
-
-            value={searchTerm}
-
-            onChange={(event) => setSearchTerm(event.target.value)}
-
-          />
-
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium text-neutral-600">Visualização</span>
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-lg border border-neutral-200 bg-white p-1">
-              <Button
-                type="button"
-                size="icon"
-                variant={viewMode === "cards" ? "primary" : "ghost"}
-                onClick={() => setViewMode("cards")}
-                aria-pressed={viewMode === "cards"}
-              >
-                <LayoutGrid className="size-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant={viewMode === "list" ? "primary" : "ghost"}
-                onClick={() => setViewMode("list")}
-                aria-pressed={viewMode === "list"}
-              >
-                <List className="size-4" />
-              </Button>
-            </div>
-
-            <Button
-
-              variant="secondary"
-
-              size="sm"
-
-              onClick={handleRefresh}
-
-              disabled={refreshing}
-
-              type="button"
-
-            >
-
-              <RefreshCcw className={clsx("mr-2 size-4", refreshing && "animate-spin")}
-
- />
-
-              Atualizar
-
-            </Button>
-
-          </div>
-
-        </div>
-
-      </div>
-
-      {loading ? (
-
+  const renderContractsSection = () => {
+    if (loading) {
+      return (
         <Card>
-
           <p className="text-sm text-neutral-500">Carregando contratos...</p>
-
         </Card>
+      );
+    }
 
-      ) : filteredContracts.length === 0 ? (
-
+    if (filteredContracts.length === 0) {
+      return (
         <Card>
-
           <p className="text-sm text-neutral-500">
-
             Nenhum contrato encontrado para o filtro informado.
-
           </p>
-
         </Card>
+      );
+    }
 
-      ) : viewMode === "cards" ? (
-
+    if (viewMode === "cards") {
+      return (
         <div className="grid gap-4 xl:grid-cols-2">
-
           {filteredContracts.map((contract) => (
-
             <Card key={contract.id} className="space-y-4">
 
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -1011,14 +1084,14 @@ export default function ContratosFornecedorPage() {
 
                 </div>
 
-                <div className="flex items-center gap-2 text-neutral-700">
-
-                  <p className="text-neutral-500">Vigência</p>
-
-                  <CalendarDays className="size-4 text-neutral-400" />
-
-                  <span>{formatDateRange(contract.data_inicio, contract.data_fim)}</span>
-
+                <div className="text-neutral-700">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="size-4 text-neutral-400" />
+                    <span className="text-neutral-500">Vigência</span>
+                  </div>
+                  <p className="mt-1 font-medium text-neutral-900">
+                    {formatDateRange(contract.data_inicio, contract.data_fim)}
+                  </p>
                 </div>
 
               </div>
@@ -1028,234 +1101,365 @@ export default function ContratosFornecedorPage() {
           ))}
 
         </div>
-
-      ) : (
-
-        <Card className="overflow-hidden">
-
-          <div className="overflow-x-auto">
-
-            <table className="min-w-full divide-y divide-neutral-200 text-sm">
-
-              <thead className="bg-neutral-50 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
-
-                <tr>
-
-                  <th className="px-4 py-3">Contrato</th>
-
-                  <th className="px-4 py-3">Valores</th>
-
-                  <th className="px-4 py-3">Vigência</th>
-
-                  <th className="px-4 py-3">Status</th>
-
-                  <th className="px-4 py-3 text-right">Ações</th>
-
-                </tr>
-
-              </thead>
-
-              <tbody className="divide-y divide-neutral-100 text-neutral-700">
-
-                {filteredContracts.map((contract) => {
-
-                  const statusLabel =
-
-                    STATUS_OPTIONS.find((option) => option.value === contract.status)?.label ??
-
-                    "Sem status";
-
-                  return (
-
-                    <tr key={`${contract.id}-list`}>
-
-                      <td className="px-4 py-3">
-
-                        <p className="font-semibold text-neutral-900">
-
-                          {contract.numero_contrato}
-
-                        </p>
-
-                        <p className="text-xs text-neutral-500">
-
-                          {contract.fornecedor?.nome ?? "Fornecedor não informado"}
-
-                        </p>
-
-                      </td>
-
-                      <td className="px-4 py-3">
-
-                        <p className="font-semibold text-neutral-900">
-
-                          {formatCurrency(contract.valor_total)}
-
-                        </p>
-
-                        <p className="text-xs text-neutral-500">
-
-                          Comprometido: {formatCurrency(contract.valor_comprometido)}
-
-                        </p>
-
-                      </td>
-
-                      <td className="px-4 py-3">
-
-                        {formatDateRange(contract.data_inicio, contract.data_fim)}
-
-                      </td>
-
-                      <td className="px-4 py-3">
-
-                        <span
-
-                          className={clsx(
-
-                            "rounded-full px-2 py-0.5 text-xs font-medium",
-
-                            statusStyles[contract.status ?? "rascunho"] ??
-
-                              "bg-neutral-100 text-neutral-600"
-
-                          )}
-
-                        >
-
-                          {statusLabel}
-
-                        </span>
-
-                      </td>
-
-                      <td className="px-4 py-3 text-right">
-
-                        <Tooltip.Provider delayDuration={150}>
-
-                          <div className="flex items-center justify-end gap-2">
-
-                            <Tooltip.Root>
-
-                              <Tooltip.Trigger asChild>
-
-                                <Button
-
-                                  variant="secondary"
-
-                                  size="sm"
-
-                                  onClick={() => openEditForm(contract)}
-
-                                  type="button"
-
-                                >
-
-                                  <Pencil className="mr-2 size-4" />
-
-                                  Editar
-
-                                </Button>
-
-                              </Tooltip.Trigger>
-
-                              <Tooltip.Portal>
-
-                                <Tooltip.Content
-
-                                  side="top"
-
-                                  sideOffset={6}
-
-                                  className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-
-                                >
-
-                                  Editar contrato
-
-                                  <Tooltip.Arrow className="fill-white" />
-
-                                </Tooltip.Content>
-
-                              </Tooltip.Portal>
-
-                            </Tooltip.Root>
-
-                            <Tooltip.Root>
-
-                              <Tooltip.Trigger asChild>
-
-                                <Button
-
-                                  variant="ghost"
-
-                                  size="icon"
-
-                                  type="button"
-
-                                  onClick={() => {
-
-                                    setPendingContract(contract);
-
-                                    setDeleteOpen(true);
-
-                                    setDeleteError(null);
-
-                                  }}
-
-                                  aria-label="Excluir contrato"
-
-                                >
-
-                                  <Trash2 className="size-4" />
-
-                                </Button>
-
-                              </Tooltip.Trigger>
-
-                              <Tooltip.Portal>
-
-                                <Tooltip.Content
-
-                                  side="top"
-
-                                  sideOffset={6}
-
-                                  className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-
-                                >
-
-                                  Excluir contrato
-
-                                  <Tooltip.Arrow className="fill-white" />
-
-                                </Tooltip.Content>
-
-                              </Tooltip.Portal>
-
-                            </Tooltip.Root>
-
-                          </div>
-
-                        </Tooltip.Provider>
-
-                      </td>
-
-                    </tr>
-
-                  );
-
-                })}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
+      );
+    }
+
+    return (
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-neutral-200 text-sm">
+            <thead className="bg-neutral-50 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              <tr>
+                <th className="px-4 py-3">Contrato</th>
+                <th className="px-4 py-3">Valores</th>
+                <th className="px-4 py-3">Vigência</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100 text-neutral-700">
+              {filteredContracts.map((contract) => {
+                const statusLabel =
+                  STATUS_OPTIONS.find((option) => option.value === contract.status)?.label ??
+                  "Sem status";
+                return (
+                  <tr key={`${contract.id}-list`}>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-neutral-900">{contract.numero_contrato}</p>
+                      <p className="text-xs text-neutral-500">
+                        {contract.fornecedor?.nome ?? "Fornecedor não informado"}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-neutral-900">
+                        {formatCurrency(contract.valor_total)}
+                      </p>
+                      <p className="text-xs text-neutral-500">
+                        Comprometido: {formatCurrency(contract.valor_comprometido)}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3">
+                      {formatDateRange(contract.data_inicio, contract.data_fim)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={clsx(
+                          "rounded-full px-2 py-0.5 text-xs font-medium",
+                          statusStyles[contract.status ?? "rascunho"] ??
+                            "bg-neutral-100 text-neutral-600"
+                        )}
+                      >
+                        {statusLabel}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Tooltip.Provider delayDuration={150}>
+                        <div className="flex items-center justify-end gap-2">
+                          <Tooltip.Root>
+                            <Tooltip.Trigger asChild>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => openEditForm(contract)}
+                                type="button"
+                              >
+                                <Pencil className="mr-2 size-4" />
+                                Editar
+                              </Button>
+                            </Tooltip.Trigger>
+                            <Tooltip.Portal>
+                              <Tooltip.Content
+                                side="top"
+                                sideOffset={6}
+                                className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                              >
+                                Editar contrato
+                                <Tooltip.Arrow className="fill-white" />
+                              </Tooltip.Content>
+                            </Tooltip.Portal>
+                          </Tooltip.Root>
+                          <Tooltip.Root>
+                            <Tooltip.Trigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                type="button"
+                                onClick={() => {
+                                  setPendingContract(contract);
+                                  setDeleteOpen(true);
+                                  setDeleteError(null);
+                                }}
+                                aria-label="Excluir contrato"
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </Tooltip.Trigger>
+                            <Tooltip.Portal>
+                              <Tooltip.Content
+                                side="top"
+                                sideOffset={6}
+                                className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                              >
+                                Excluir contrato
+                                <Tooltip.Arrow className="fill-white" />
+                              </Tooltip.Content>
+                            </Tooltip.Portal>
+                          </Tooltip.Root>
+                        </div>
+                      </Tooltip.Provider>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    );
+  };
+
+  const renderSuppliersSection = () => {
+    if (suppliersLoading) {
+      return (
+        <Card>
+          <p className="text-sm text-neutral-500">Carregando fornecedores...</p>
         </Card>
+      );
+    }
 
-      )}
+    if (filteredSuppliers.length === 0) {
+      return (
+        <Card>
+          <div className="flex flex-col items-center justify-center gap-3 text-center text-sm text-neutral-500">
+            <p>Nenhum fornecedor encontrado.</p>
+            {supplierSearchTerm ? (
+              <Button variant="secondary" size="sm" onClick={() => setSupplierSearchTerm("")}>
+                Limpar busca
+              </Button>
+            ) : (
+              <Button onClick={openCreateSupplierForm} disabled={supabaseUnavailable}>
+                <Plus className="mr-2 size-4" />
+                Cadastrar fornecedor
+              </Button>
+            )}
+          </div>
+        </Card>
+      );
+    }
+
+    return (
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-neutral-100 text-sm">
+            <thead className="bg-neutral-50 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              <tr>
+                <th className="px-4 py-3">Fornecedor</th>
+                <th className="px-4 py-3">Documento</th>
+                <th className="px-4 py-3">Email de contato</th>
+                <th className="px-4 py-3 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100 text-neutral-700">
+              {filteredSuppliers.map((supplier) => (
+                <tr key={supplier.id}>
+                  <td className="px-4 py-3 font-semibold text-neutral-900">{supplier.nome}</td>
+                  <td className="px-4 py-3 text-neutral-700">
+                    {supplier.documento ?? "Documento não informado"}
+                  </td>
+                  <td className="px-4 py-3 text-neutral-700">
+                    {supplier.email_contato ?? "Email não informado"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Tooltip.Provider delayDuration={150}>
+                      <div className="flex justify-end gap-2">
+                        <Tooltip.Root>
+                          <Tooltip.Trigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              type="button"
+                              onClick={() => openEditSupplierForm(supplier)}
+                              disabled={supabaseUnavailable}
+                            >
+                              <Pencil className="mr-2 size-4" />
+                              Editar
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content
+                              side="top"
+                              sideOffset={6}
+                              className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                            >
+                              Editar fornecedor
+                              <Tooltip.Arrow className="fill-white" />
+                            </Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                        <Tooltip.Root>
+                          <Tooltip.Trigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              type="button"
+                              onClick={() => openDeleteSupplierDialog(supplier)}
+                              className="text-danger"
+                              disabled={supabaseUnavailable}
+                              aria-label="Excluir fornecedor"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content
+                              side="top"
+                              sideOffset={6}
+                              className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                            >
+                              Excluir fornecedor
+                              <Tooltip.Arrow className="fill-white" />
+                            </Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                      </div>
+                    </Tooltip.Provider>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    );
+  };
+
+  const renderToolbar = () => {
+    if (activeTab === "contracts") {
+      return (
+        <div className="flex flex-col gap-4 rounded-xl border border-neutral-100 bg-white/80 p-4 shadow-sm md:flex-row md:items-end md:gap-6">
+          <div className="w-full md:flex-1">
+            <label className="text-sm font-medium text-neutral-600">
+              Buscar por número ou fornecedor
+            </label>
+            <input
+              type="text"
+              placeholder="Ex.: FORN-2024-08 ou Tech Experts"
+              className="mt-2 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 focus:border-brand-500 focus:outline-none"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-2 md:w-auto">
+            <span className="text-sm font-medium text-neutral-600">Visualização</span>
+            <div className="flex items-center gap-2">
+              <div className="flex rounded-lg border border-neutral-200 bg-white p-1">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant={viewMode === "cards" ? "primary" : "ghost"}
+                  onClick={() => setViewMode("cards")}
+                  aria-pressed={viewMode === "cards"}
+                >
+                  <LayoutGrid className="size-4" />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant={viewMode === "list" ? "primary" : "ghost"}
+                  onClick={() => setViewMode("list")}
+                  aria-pressed={viewMode === "list"}
+                >
+                  <List className="size-4" />
+                </Button>
+              </div>
+              <div className="flex flex-col gap-2 md:flex-row">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  type="button"
+                >
+                  <RefreshCcw className={clsx("mr-2 size-4", refreshing && "animate-spin")} />
+                  Atualizar
+                </Button>
+                <Button onClick={openCreateForm} disabled={supabaseUnavailable}>
+                  <Plus className="mr-2 size-4" />
+                  Novo contrato
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-4 rounded-xl border border-neutral-100 bg-white/80 p-4 shadow-sm md:flex-row md:items-end md:justify-between">
+        <div className="w-full md:flex-1">
+          <label className="text-sm font-medium text-neutral-600">Buscar fornecedor</label>
+          <input
+            type="text"
+            placeholder="Ex.: Nome, documento ou email"
+            className="mt-2 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 focus:border-brand-500 focus:outline-none"
+            value={supplierSearchTerm}
+            onChange={(event) => setSupplierSearchTerm(event.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-2 md:flex-row md:items-end">
+          <Button
+            variant="secondary"
+            size="sm"
+            type="button"
+            onClick={() => void loadSuppliers({ silent: true })}
+            disabled={suppliersRefreshing}
+          >
+            <RefreshCcw className={clsx("mr-2 size-4", suppliersRefreshing && "animate-spin")} />
+            {suppliersRefreshing ? "Atualizando..." : "Atualizar fornecedores"}
+          </Button>
+          <Button onClick={openCreateSupplierForm} disabled={supabaseUnavailable}>
+            <Plus className="mr-2 size-4" />
+            Novo fornecedor
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Contratos de Fornecedor"
+        subtitle="Gerencie contratos, vigências e valores negociados com fornecedores."
+      />
+
+      {error ? (
+        <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant={activeTab === "contracts" ? "secondary" : "ghost"}
+          onClick={() => setActiveTab("contracts")}
+        >
+          Contratos
+        </Button>
+        <Button
+          type="button"
+          variant={activeTab === "suppliers" ? "secondary" : "ghost"}
+          onClick={() => setActiveTab("suppliers")}
+        >
+          Fornecedores
+        </Button>
+      </div>
+
+      {renderToolbar()}
+
+      {activeTab === "contracts" ? renderContractsSection() : renderSuppliersSection()}
+
       <Dialog.Root open={formOpen} onOpenChange={handleFormDialogChange}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
@@ -1558,6 +1762,159 @@ export default function ContratosFornecedorPage() {
 
         </Dialog.Portal>
 
+      </Dialog.Root>
+
+      <Dialog.Root open={supplierFormOpen} onOpenChange={handleSupplierFormDialogChange}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl focus:outline-none">
+            <div className="flex items-start justify-between">
+              <div>
+                <Dialog.Title className="text-lg font-semibold text-neutral-900">
+                  {supplierModeIsCreate ? "Novo fornecedor" : "Editar fornecedor"}
+                </Dialog.Title>
+                <Dialog.Description className="text-sm text-neutral-500">
+                  Cadastre ou atualize os dados do fornecedor.
+                </Dialog.Description>
+              </div>
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
+                  onClick={resetSupplierForm}
+                  aria-label="Fechar modal de fornecedor"
+                >
+                  <X className="size-4" />
+                </button>
+              </Dialog.Close>
+            </div>
+
+            {supplierFormErrors.general ? (
+              <div className="mt-4 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+                {supplierFormErrors.general}
+              </div>
+            ) : null}
+
+            <form className="mt-4 space-y-4" onSubmit={handleSupplierSubmit}>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-neutral-700" htmlFor="supplier_nome">
+                  Nome do fornecedor
+                </label>
+                <input
+                  id="supplier_nome"
+                  name="nome"
+                  value={supplierFormState.nome}
+                  onChange={handleSupplierInputChange}
+                  className={inputClassName(Boolean(supplierFormErrors.nome))}
+                  placeholder="Ex.: ACME Serviços"
+                />
+                {supplierFormErrors.nome ? (
+                  <p className="text-xs text-danger">{supplierFormErrors.nome}</p>
+                ) : null}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-neutral-700" htmlFor="supplier_documento">
+                  Documento
+                </label>
+                <input
+                  id="supplier_documento"
+                  name="documento"
+                  value={supplierFormState.documento}
+                  onChange={handleSupplierInputChange}
+                  className={inputClassName(Boolean(supplierFormErrors.documento))}
+                  placeholder="CNPJ/CPF (opcional)"
+                />
+                {supplierFormErrors.documento ? (
+                  <p className="text-xs text-danger">{supplierFormErrors.documento}</p>
+                ) : null}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-neutral-700" htmlFor="supplier_email">
+                  Email de contato
+                </label>
+                <input
+                  id="supplier_email"
+                  type="email"
+                  name="email_contato"
+                  value={supplierFormState.email_contato}
+                  onChange={handleSupplierInputChange}
+                  className={inputClassName(Boolean(supplierFormErrors.email_contato))}
+                  placeholder="contato@empresa.com (opcional)"
+                />
+                {supplierFormErrors.email_contato ? (
+                  <p className="text-xs text-danger">{supplierFormErrors.email_contato}</p>
+                ) : (
+                  <p className="text-xs text-neutral-500">
+                    Informe um email para avisos e comunicados.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <Dialog.Close asChild>
+                  <Button type="button" variant="outline" onClick={resetSupplierForm}>
+                    Cancelar
+                  </Button>
+                </Dialog.Close>
+                <Button type="submit" disabled={supplierSubmitting}>
+                  {supplierSubmitting
+                    ? supplierModeIsCreate
+                      ? "Salvando..."
+                      : "Atualizando..."
+                    : supplierModeIsCreate
+                      ? "Salvar fornecedor"
+                      : "Atualizar fornecedor"}
+                </Button>
+              </div>
+            </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      <Dialog.Root open={supplierDeleteOpen} onOpenChange={setSupplierDeleteOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl focus:outline-none">
+            <Dialog.Title className="text-lg font-semibold text-neutral-900">
+              Excluir fornecedor
+            </Dialog.Title>
+            <Dialog.Description className="mt-2 text-sm text-neutral-600">
+              Confirma a exclusão do fornecedor{" "}
+              <span className="font-semibold text-neutral-900">{pendingSupplier?.nome}</span>? Essa
+              ação não pode ser desfeita.
+            </Dialog.Description>
+
+            {supplierDeleteError ? (
+              <div className="mt-4 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+                {supplierDeleteError}
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <Dialog.Close asChild>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => {
+                    setPendingSupplier(null);
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </Dialog.Close>
+              <Button
+                variant="destructive"
+                type="button"
+                onClick={handleSupplierDelete}
+                disabled={supplierDeleteLoading || !pendingSupplier}
+              >
+                {supplierDeleteLoading ? "Excluindo..." : "Excluir"}
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
       </Dialog.Root>
 
       <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
