@@ -320,15 +320,41 @@ export default function RecursosPage() {
     void Promise.all([loadSuppliers(), loadProfiles(), loadResources()]);
   }, [loadProfiles, loadResources, loadSuppliers]);
 
+  const displayResources = useMemo(() => {
+    return resources.map((resource) => {
+      const fallbackSupplier = suppliersMap.get(resource.fornecedor_id ?? "") ?? null;
+      const fallbackProfile = profilesMap.get(resource.perfil_id ?? "") ?? null;
+
+      return {
+        ...resource,
+        fornecedor:
+          resource.fornecedor ??
+          (fallbackSupplier ? { id: fallbackSupplier.id, nome: fallbackSupplier.nome } : null),
+        perfil:
+          resource.perfil ??
+          (fallbackProfile
+            ? {
+                id: fallbackProfile.id,
+                nome: fallbackProfile.nome,
+                valor_hora: fallbackProfile.valor_hora
+              }
+            : null)
+      };
+    });
+  }, [resources, suppliersMap, profilesMap]);
+
   const filteredResources = useMemo(() => {
     const normalized = searchTerm.trim().toLowerCase();
-    return resources.filter((resource) => {
+    return displayResources.filter((resource) => {
+      const supplierName = resource.fornecedor?.nome ?? "";
+      const profileName = resource.perfil?.nome ?? "";
+
       const matchesSearch =
         normalized.length === 0 ||
         resource.nome_completo?.toLowerCase().includes(normalized) ||
         resource.email?.toLowerCase().includes(normalized) ||
-        resource.fornecedor?.nome?.toLowerCase().includes(normalized) ||
-        resource.perfil?.nome?.toLowerCase().includes(normalized);
+        supplierName.toLowerCase().includes(normalized) ||
+        profileName.toLowerCase().includes(normalized);
 
       const isActive = resource.ativo !== false;
       const matchesStatus =
@@ -338,7 +364,7 @@ export default function RecursosPage() {
 
       return matchesSearch && matchesStatus;
     });
-  }, [resources, searchTerm, statusFilter]);
+  }, [displayResources, searchTerm, statusFilter]);
 
   const filteredProfiles = useMemo(() => {
     const normalized = profileSearchTerm.trim().toLowerCase();
@@ -790,11 +816,23 @@ export default function RecursosPage() {
             </Card>
           ) : viewMode === "cards" ? (
             <div className="grid gap-4 xl:grid-cols-2">
-              {filteredResources.map((resource) => {
-                const isActive = resource.ativo !== false;
-                return (
-                  <Card key={resource.id} className="space-y-4">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          {filteredResources.map((resource) => {
+            const isActive = resource.ativo !== false;
+            const supplierName =
+              resource.fornecedor?.nome ??
+              suppliersMap.get(resource.fornecedor_id ?? "")?.nome ??
+              "Fornecedor não informado";
+            const profileName =
+              resource.perfil?.nome ??
+              profilesMap.get(resource.perfil_id ?? "")?.nome ??
+              "Perfil não informado";
+            const profileRate =
+              resource.perfil?.valor_hora ??
+              profilesMap.get(resource.perfil_id ?? "")?.valor_hora ??
+              null;
+            return (
+              <Card key={resource.id} className="space-y-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
                         <p className="text-xs uppercase tracking-wide text-neutral-400">Recurso</p>
                         <div className="flex items-center gap-2">
@@ -868,25 +906,21 @@ export default function RecursosPage() {
                       </Tooltip.Provider>
                     </div>
 
-                    <div className="grid gap-3 text-sm text-neutral-600 md:grid-cols-2">
-                      <div>
-                        <p className="text-neutral-500">Fornecedor</p>
-                        <p className="font-medium text-neutral-900">
-                          {resource.fornecedor?.nome ?? "Fornecedor não informado"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-neutral-500">Perfil</p>
-                        <p className="font-medium text-neutral-900">
-                          {resource.perfil?.nome ?? "Perfil não informado"}
-                        </p>
-                        {resource.perfil?.valor_hora ? (
-                          <p className="text-xs text-neutral-500">
-                            Valor hora: {formatCurrency(resource.perfil.valor_hora)}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
+                <div className="grid gap-3 text-sm text-neutral-600 md:grid-cols-2">
+                  <div>
+                    <p className="text-neutral-500">Fornecedor</p>
+                    <p className="font-medium text-neutral-900">{supplierName}</p>
+                  </div>
+                  <div>
+                    <p className="text-neutral-500">Perfil</p>
+                    <p className="font-medium text-neutral-900">{profileName}</p>
+                    {profileRate ? (
+                      <p className="text-xs text-neutral-500">
+                        Valor hora: {formatCurrency(profileRate)}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
                   </Card>
                 );
               })}
@@ -907,6 +941,18 @@ export default function RecursosPage() {
                   <tbody className="divide-y divide-neutral-100 text-neutral-700">
                     {filteredResources.map((resource) => {
                       const isActive = resource.ativo !== false;
+                      const supplierName =
+                        resource.fornecedor?.nome ??
+                        suppliersMap.get(resource.fornecedor_id ?? "")?.nome ??
+                        "Fornecedor não informado";
+                      const profileName =
+                        resource.perfil?.nome ??
+                        profilesMap.get(resource.perfil_id ?? "")?.nome ??
+                        "Perfil não informado";
+                      const profileRate =
+                        resource.perfil?.valor_hora ??
+                        profilesMap.get(resource.perfil_id ?? "")?.valor_hora ??
+                        null;
                       return (
                         <tr key={`${resource.id}-list`}>
                           <td className="whitespace-nowrap px-4 py-3">
@@ -930,13 +976,11 @@ export default function RecursosPage() {
                             </p>
                           </td>
                           <td className="px-4 py-3">
-                            {resource.fornecedor?.nome ?? "Fornecedor não informado"}
+                            {supplierName}
                           </td>
-                          <td className="px-4 py-3">{resource.perfil?.nome ?? "Perfil não informado"}</td>
+                          <td className="px-4 py-3">{profileName}</td>
                           <td className="px-4 py-3">
-                            {resource.perfil?.valor_hora
-                              ? formatCurrency(resource.perfil.valor_hora)
-                              : "—"}
+                            {profileRate ? formatCurrency(profileRate) : "—"}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <Tooltip.Provider delayDuration={150}>

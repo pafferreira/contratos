@@ -43,6 +43,14 @@ type FormErrors = Partial<Record<keyof ContractFormState, string>> & {
   general?: string;
 };
 
+type ClientFormState = {
+  id?: string;
+  nome: string;
+  documento: string;
+};
+
+type ClientFormErrors = Partial<Record<keyof ClientFormState | "general", string>>;
+
 const CONTRACTS_TABLE =
   (process.env.NEXT_PUBLIC_SUPABASE_CONTRACTS_TABLE ??
     "C_CONTRATOS_CLIENTE") as keyof Database["public"]["Tables"];
@@ -77,6 +85,11 @@ const EMPTY_FORM_STATE: ContractFormState = {
   valor_comprometido: "",
   valor_comprometido_display: "",
   status: "rascunho"
+};
+
+const EMPTY_CLIENT_FORM_STATE: ClientFormState = {
+  nome: "",
+  documento: ""
 };
 
 const ContractFormSchema = z
@@ -118,6 +131,16 @@ const ContractFormSchema = z
       path: ["valor_comprometido"]
     }
   );
+
+const ClientFormSchema = z.object({
+  nome: z.string().trim().min(1, "Informe o nome do cliente"),
+  documento: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .transform((value = "") => value)
+});
 
 function formatCurrency(value?: number | null) {
   if (typeof value !== "number") {
@@ -169,6 +192,7 @@ export default function ContratosPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"contracts" | "clients">("contracts");
 
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
@@ -183,6 +207,19 @@ export default function ContratosPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [searchTerm, setSearchTerm] = useState("");
+
+  const [clientFormOpen, setClientFormOpen] = useState(false);
+  const [clientFormMode, setClientFormMode] = useState<"create" | "edit">("create");
+  const [clientFormState, setClientFormState] = useState<ClientFormState>({
+    ...EMPTY_CLIENT_FORM_STATE
+  });
+  const [clientFormErrors, setClientFormErrors] = useState<ClientFormErrors>({});
+  const [clientSubmitting, setClientSubmitting] = useState(false);
+  const [clientDeleteOpen, setClientDeleteOpen] = useState(false);
+  const [pendingClient, setPendingClient] = useState<ClientRow | null>(null);
+  const [clientDeleteError, setClientDeleteError] = useState<string | null>(null);
+  const [clientDeleteLoading, setClientDeleteLoading] = useState(false);
+  const [clientSearchTerm, setClientSearchTerm] = useState("");
 
   const clientsMap = useMemo(() => {
     const map = new Map<string, ClientRow>();
@@ -208,6 +245,36 @@ export default function ContratosPage() {
       );
     });
   }, [contracts, searchTerm, clientsMap]);
+
+  const filteredClients = useMemo(() => {
+    const normalized = clientSearchTerm.trim().toLowerCase();
+    if (!normalized) return clients;
+    return clients.filter((client) => client.nome?.toLowerCase().includes(normalized));
+  }, [clients, clientSearchTerm]);
+
+  const loadClientsOnly = useCallback(async () => {
+    if (!supabase) {
+      setError(
+        "Supabase não configurado. Informe NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+      setClients([]);
+      return [];
+    }
+    const { data, error: clientError } = await supabase
+      .from(CLIENTS_TABLE)
+      .select("id, nome, documento, criado_em")
+      .order("nome");
+    if (clientError) {
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.error("Erro ao carregar clientes:", clientError);
+      }
+      setError(clientError.message ?? "Não foi possível carregar os clientes.");
+      return [];
+    }
+    setClients(data ?? []);
+    return data ?? [];
+  }, [supabase]);
 
   const loadContracts = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -273,6 +340,12 @@ export default function ContratosPage() {
     setActiveContractId(null);
     setFormMode("create");
   };
+  const resetClientFormState = () => {
+    setClientFormState({ ...EMPTY_CLIENT_FORM_STATE });
+    setClientFormErrors({});
+    setClientFormMode("create");
+    setPendingClient(null);
+  };
 
   const handleFormDialogChange = (open: boolean) => {
     if (!open) {
@@ -312,6 +385,38 @@ export default function ContratosPage() {
     });
     setFormErrors({});
     setFormOpen(true);
+  };
+
+  const openCreateClientForm = () => {
+    resetClientFormState();
+    setClientFormMode("create");
+    setClientFormOpen(true);
+  };
+
+  const openEditClientForm = (client: ClientRow) => {
+    setClientFormMode("edit");
+    setClientFormState({
+      id: client.id,
+      nome: client.nome ?? "",
+      documento: client.documento ?? ""
+    });
+    setClientFormErrors({});
+    setClientFormOpen(true);
+  };
+
+  const handleClientFormDialogChange = (open: boolean) => {
+    if (!open) {
+      setClientFormOpen(false);
+      resetClientFormState();
+      setClientSubmitting(false);
+    } else {
+      setClientFormOpen(true);
+    }
+  };
+
+  const handleClientInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    setClientFormState((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleCurrencyInputChange = (
@@ -412,6 +517,56 @@ export default function ContratosPage() {
     setFormOpen(false);
   };
 
+  const handleClientSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setClientFormErrors({});
+
+    if (!supabase) {
+      setClientFormErrors({
+        general: "Supabase não configurado. Atualize as variáveis de ambiente."
+      });
+      return;
+    }
+
+    const parsed = ClientFormSchema.safeParse(clientFormState);
+    if (!parsed.success) {
+      const fieldErrors = parsed.error.flatten().fieldErrors;
+      const formatted: ClientFormErrors = {};
+      Object.entries(fieldErrors).forEach(([field, messages]) => {
+        if (messages?.length) {
+          formatted[field as keyof ClientFormState] = messages[0] ?? "Campo obrigatório";
+        }
+      });
+      setClientFormErrors(formatted);
+      return;
+    }
+
+    const payload = {
+      nome: parsed.data.nome.trim(),
+      documento: parsed.data.documento?.trim() ? parsed.data.documento.trim() : null
+    };
+
+    setClientSubmitting(true);
+    const query = supabase.from(CLIENTS_TABLE);
+    const response =
+      clientFormMode === "edit" && clientFormState.id
+        ? await query.update(payload).eq("id", clientFormState.id)
+        : await query.insert(payload);
+    setClientSubmitting(false);
+
+    if (response.error) {
+      setClientFormErrors({
+        general: response.error.message ?? "Não foi possível salvar o cliente."
+      });
+      return;
+    }
+
+    resetClientFormState();
+    setClientFormOpen(false);
+    await loadClientsOnly();
+    await loadContracts({ silent: true });
+  };
+
   const handleDeleteDialogChange = (open: boolean) => {
     if (!open) {
       setDeleteOpen(false);
@@ -455,6 +610,36 @@ export default function ContratosPage() {
     setPendingContract(null);
   };
 
+  const openDeleteClientDialog = (client: ClientRow) => {
+    setPendingClient(client);
+    setClientDeleteError(null);
+    setClientDeleteOpen(true);
+  };
+
+  const handleClientDelete = async () => {
+    if (!pendingClient?.id) return;
+    if (!supabase) {
+      setClientDeleteError("Supabase não configurado. Atualize as variáveis de ambiente.");
+      return;
+    }
+    setClientDeleteLoading(true);
+    const { error: deleteErr } = await supabase
+      .from(CLIENTS_TABLE)
+      .delete()
+      .eq("id", pendingClient.id);
+    setClientDeleteLoading(false);
+    if (deleteErr) {
+      setClientDeleteError(
+        deleteErr.message ?? "Não foi possível excluir o cliente. Verifique vínculos de contratos."
+      );
+      return;
+    }
+    setClientDeleteOpen(false);
+    setPendingClient(null);
+    await loadClientsOnly();
+    await loadContracts({ silent: true });
+  };
+
   const handleRefresh = () => {
     void loadContracts({ silent: true });
   };
@@ -469,32 +654,10 @@ export default function ContratosPage() {
     return STATUS_OPTIONS.find((item) => item.value === value)?.label ?? value;
   };
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Contratos do Cliente"
-        subtitle="Gerencie contratos, vigências e valores negociados com clientes."
-        actions={
-          <>
-            <Button
-              variant="outline"
-              size="md"
-              onClick={handleRefresh}
-              disabled={loading || refreshing}
-            >
-              <RefreshCcw className="mr-2 size-4" />
-              {refreshing ? "Atualizando..." : "Atualizar"}
-            </Button>
-            <Button onClick={openCreateForm} disabled={supabaseUnavailable}>
-              <Plus className="mr-2 size-4" />
-              Novo contrato
-            </Button>
-          </>
-        }
-      />
-
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div className="w-full md:max-w-md">
+  const renderContractsSection = () => (
+    <Card>
+      <div className="flex flex-col gap-4 border-b border-neutral-100 pb-4 md:flex-row md:items-end md:gap-6">
+        <div className="w-full md:flex-1">
           <label className="text-sm font-medium text-neutral-600">
             Buscar por número ou cliente
           </label>
@@ -507,7 +670,7 @@ export default function ContratosPage() {
           />
         </div>
 
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 md:w-auto">
           <span className="text-sm font-medium text-neutral-600">Visualização</span>
           <div className="flex rounded-lg border border-neutral-200 bg-white p-1">
             <Button
@@ -530,263 +693,431 @@ export default function ContratosPage() {
             </Button>
           </div>
         </div>
+
+        <div className="flex flex-wrap gap-2 md:w-auto md:justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={loading || refreshing}
+          >
+            <RefreshCcw className="mr-2 size-4" />
+            {refreshing ? "Atualizando..." : "Atualizar"}
+          </Button>
+          <Button onClick={openCreateForm} disabled={supabaseUnavailable}>
+            <Plus className="mr-2 size-4" />
+            Novo contrato
+          </Button>
+        </div>
       </div>
 
-      <Card>
-        {loading ? (
-          <div className="flex h-48 items-center justify-center text-sm text-neutral-500">
-            Carregando contratos...
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center gap-3 text-center text-sm text-neutral-600">
-            <p>{error}</p>
-            <Button variant="outline" onClick={() => loadContracts()}>
-              Tentar novamente
+      {loading ? (
+        <div className="flex h-48 items-center justify-center text-sm text-neutral-500">
+          Carregando contratos...
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center gap-3 text-center text-sm text-neutral-600">
+          <p>{error}</p>
+          <Button variant="outline" onClick={() => loadContracts()}>
+            Tentar novamente
+          </Button>
+        </div>
+      ) : contracts.length === 0 ? (
+        <div className="flex h-48 flex-col items-center justify-center gap-3 text-center text-sm text-neutral-500">
+          <p>Nenhum contrato cadastrado ainda.</p>
+          <Button onClick={openCreateForm} disabled={supabaseUnavailable}>
+            <Plus className="mr-2 size-4" />
+            Cadastrar primeiro contrato
+          </Button>
+        </div>
+      ) : filteredContracts.length === 0 ? (
+        <div className="flex h-32 flex-col items-center justify-center gap-2 text-center text-sm text-neutral-500">
+          <p>Nenhum contrato encontrado para o filtro informado.</p>
+          {searchTerm ? (
+            <Button variant="secondary" size="sm" onClick={() => setSearchTerm("")}>
+              Limpar busca
             </Button>
-          </div>
-        ) : contracts.length === 0 ? (
-          <div className="flex h-48 flex-col items-center justify-center gap-3 text-center text-sm text-neutral-500">
-            <p>Nenhum contrato cadastrado ainda.</p>
-            <Button onClick={openCreateForm} disabled={supabaseUnavailable}>
-              <Plus className="mr-2 size-4" />
-              Cadastrar primeiro contrato
-            </Button>
-          </div>
-        ) : filteredContracts.length === 0 ? (
-          <div className="flex h-32 flex-col items-center justify-center gap-2 text-center text-sm text-neutral-500">
-            <p>Nenhum contrato encontrado para o filtro informado.</p>
-            {searchTerm ? (
-              <Button variant="secondary" size="sm" onClick={() => setSearchTerm("")}>
-                Limpar busca
-              </Button>
-            ) : null}
-          </div>
-        ) : viewMode === "cards" ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            {filteredContracts.map((contract) => (
-              <Card key={`${contract.id}-card`} className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-neutral-500">Contrato</p>
-                    <h3 className="text-lg font-semibold text-neutral-900">
-                      {contract.numero_contrato}
-                    </h3>
-                    <p className="text-xs text-neutral-500">{contract.id}</p>
-                  </div>
+          ) : null}
+        </div>
+      ) : viewMode === "cards" ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filteredContracts.map((contract) => (
+            <Card key={contract.id} className="space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs uppercase tracking-wide text-neutral-500">Contrato</p>
+                  <p className="text-lg font-semibold text-neutral-900">
+                    {contract.numero_contrato}
+                  </p>
+                  <p className="text-sm text-neutral-600">
+                    {contract.cliente?.nome ??
+                      clientsMap.get(contract.cliente_id ?? "")?.nome ??
+                      "Cliente não encontrado"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
                   <Tooltip.Provider delayDuration={150}>
-                    <div className="flex flex-col gap-2">
-                      <Tooltip.Root>
-                        <Tooltip.Trigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditForm(contract)}
-                            aria-label={`Editar contrato ${contract.numero_contrato}`}
-                            disabled={supabaseUnavailable}
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Portal>
-                          <Tooltip.Content
-                            side="top"
-                            sideOffset={6}
-                            className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-                          >
-                            Editar contrato
-                            <Tooltip.Arrow className="fill-white" />
-                          </Tooltip.Content>
-                        </Tooltip.Portal>
-                      </Tooltip.Root>
-                      <Tooltip.Root>
-                        <Tooltip.Trigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-danger"
-                            onClick={() => openDeleteDialog(contract)}
-                            aria-label={`Excluir contrato ${contract.numero_contrato}`}
-                            disabled={supabaseUnavailable}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Portal>
-                          <Tooltip.Content
-                            side="top"
-                            sideOffset={6}
-                            className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-                          >
-                            Excluir contrato
-                            <Tooltip.Arrow className="fill-white" />
-                          </Tooltip.Content>
-                        </Tooltip.Portal>
-                      </Tooltip.Root>
-                    </div>
+                    <Tooltip.Root>
+                      <Tooltip.Trigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEditForm(contract)}
+                          aria-label={`Editar contrato ${contract.numero_contrato}`}
+                          disabled={supabaseUnavailable}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                      </Tooltip.Trigger>
+                      <Tooltip.Portal>
+                        <Tooltip.Content
+                          side="top"
+                          sideOffset={6}
+                          className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                        >
+                          Editar contrato
+                          <Tooltip.Arrow className="fill-white" />
+                        </Tooltip.Content>
+                      </Tooltip.Portal>
+                    </Tooltip.Root>
+
+                    <Tooltip.Root>
+                      <Tooltip.Trigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-danger"
+                          onClick={() => openDeleteDialog(contract)}
+                          aria-label={`Excluir contrato ${contract.numero_contrato}`}
+                          disabled={supabaseUnavailable}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </Tooltip.Trigger>
+                      <Tooltip.Portal>
+                        <Tooltip.Content
+                          side="top"
+                          sideOffset={6}
+                          className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                        >
+                          Excluir contrato
+                          <Tooltip.Arrow className="fill-white" />
+                        </Tooltip.Content>
+                      </Tooltip.Portal>
+                    </Tooltip.Root>
                   </Tooltip.Provider>
                 </div>
-                <dl className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <dt className="text-neutral-500">Cliente</dt>
-                    <dd className="font-medium text-neutral-900">
-                      {contract.cliente?.nome ??
-                        clientsMap.get(contract.cliente_id ?? "")?.nome ??
-                        "Cliente não encontrado"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-neutral-500">Vigência</dt>
-                    <dd className="font-medium text-neutral-900">
-                      {formatDateRange(contract.data_inicio, contract.data_fim)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-neutral-500">Valor total</dt>
-                    <dd className="font-medium text-neutral-900">
-                      {formatCurrency(contract.valor_total)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-neutral-500">Comprometido</dt>
-                    <dd className="font-medium text-neutral-900">
-                      {formatCurrency(contract.valor_comprometido)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-neutral-500">Saldo disponível</dt>
-                    <dd className="font-semibold text-success">
-                      {formatCurrency(contract.valor_disponivel)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-neutral-500">Status</dt>
-                    <dd>
-                      <span
-                        className={clsx(
-                          "inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize",
-                          statusStyles[contract.status ?? ""] ??
-                            "bg-neutral-100 text-neutral-600"
-                        )}
-                      >
-                        {getStatusLabel(contract.status)}
-                      </span>
-                    </dd>
-                  </div>
-                </dl>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-neutral-100 text-sm">
-              <thead>
-                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  <th className="p-3">Contrato</th>
-                  <th className="p-3">Cliente</th>
-                  <th className="p-3">Vigência</th>
-                  <th className="p-3">Valor total</th>
-                  <th className="p-3">Comprometido</th>
-                  <th className="p-3">Saldo disponível</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100 text-neutral-700">
-                {filteredContracts.map((contract) => (
-                  <tr key={contract.id}>
-                    <td className="px-3 py-4">
-                      <div className="font-semibold text-neutral-900">
-                        {contract.numero_contrato}
+              </div>
+
+              <dl className="grid grid-cols-2 gap-3 text-sm text-neutral-600 md:grid-cols-3">
+                <div>
+                  <dt className="text-neutral-500">Vigência</dt>
+                  <dd className="font-medium text-neutral-900">
+                    {formatDateRange(contract.data_inicio, contract.data_fim)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-neutral-500">Valor total</dt>
+                  <dd className="font-medium text-neutral-900">
+                    {formatCurrency(contract.valor_total)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-neutral-500">Comprometido</dt>
+                  <dd className="font-medium text-neutral-900">
+                    {formatCurrency(contract.valor_comprometido)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-neutral-500">Saldo disponível</dt>
+                  <dd className="font-semibold text-success">
+                    {formatCurrency(contract.valor_disponivel)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-neutral-500">Status</dt>
+                  <dd>
+                    <span
+                      className={clsx(
+                        "inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize",
+                        statusStyles[contract.status ?? ""] ?? "bg-neutral-100 text-neutral-600"
+                      )}
+                    >
+                      {getStatusLabel(contract.status)}
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-neutral-100 text-sm">
+            <thead>
+              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                <th className="p-3">Contrato</th>
+                <th className="p-3">Cliente</th>
+                <th className="p-3">Vigência</th>
+                <th className="p-3">Valor total</th>
+                <th className="p-3">Comprometido</th>
+                <th className="p-3">Saldo disponível</th>
+                <th className="p-3">Status</th>
+                <th className="p-3 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100 text-neutral-700">
+              {filteredContracts.map((contract) => (
+                <tr key={contract.id}>
+                  <td className="px-3 py-4">
+                    <div className="font-semibold text-neutral-900">
+                      {contract.numero_contrato}
+                    </div>
+                    <p className="text-xs text-neutral-500">{contract.id}</p>
+                  </td>
+                  <td className="px-3 py-4">
+                    {contract.cliente?.nome ??
+                      clientsMap.get(contract.cliente_id ?? "")?.nome ??
+                      "Cliente não encontrado"}
+                  </td>
+                  <td className="px-3 py-4">
+                    {formatDateRange(contract.data_inicio, contract.data_fim)}
+                  </td>
+                  <td className="px-3 py-4 font-medium text-neutral-900">
+                    {formatCurrency(contract.valor_total)}
+                  </td>
+                  <td className="px-3 py-4 text-neutral-800">
+                    {formatCurrency(contract.valor_comprometido)}
+                  </td>
+                  <td className="px-3 py-4 font-semibold text-success">
+                    {formatCurrency(contract.valor_disponivel)}
+                  </td>
+                  <td className="px-3 py-4">
+                    <span
+                      className={clsx(
+                        "inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize",
+                        statusStyles[contract.status ?? ""] ?? "bg-neutral-100 text-neutral-600"
+                      )}
+                    >
+                      {getStatusLabel(contract.status)}
+                    </span>
+                  </td>
+                  <td className="px-3 py-4 text-right">
+                    <Tooltip.Provider delayDuration={150}>
+                      <div className="flex flex-col items-end gap-1">
+                        <Tooltip.Root>
+                          <Tooltip.Trigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditForm(contract)}
+                              aria-label={`Editar contrato ${contract.numero_contrato}`}
+                              disabled={supabaseUnavailable}
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content
+                              side="top"
+                              sideOffset={6}
+                              className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                            >
+                              Editar contrato
+                              <Tooltip.Arrow className="fill-white" />
+                            </Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                        <Tooltip.Root>
+                          <Tooltip.Trigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-danger"
+                              onClick={() => openDeleteDialog(contract)}
+                              aria-label={`Excluir contrato ${contract.numero_contrato}`}
+                              disabled={supabaseUnavailable}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content
+                              side="top"
+                              sideOffset={6}
+                              className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                            >
+                              Excluir contrato
+                              <Tooltip.Arrow className="fill-white" />
+                            </Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
                       </div>
-                      <p className="text-xs text-neutral-500">{contract.id}</p>
-                    </td>
-                    <td className="px-3 py-4">
-                      {contract.cliente?.nome ??
-                        clientsMap.get(contract.cliente_id ?? "")?.nome ??
-                        "Cliente não encontrado"}
-                    </td>
-                    <td className="px-3 py-4">
-                      {formatDateRange(contract.data_inicio, contract.data_fim)}
-                    </td>
-                    <td className="px-3 py-4 font-medium text-neutral-900">
-                      {formatCurrency(contract.valor_total)}
-                    </td>
-                    <td className="px-3 py-4 text-neutral-800">
-                      {formatCurrency(contract.valor_comprometido)}
-                    </td>
-                    <td className="px-3 py-4 font-semibold text-success">
-                      {formatCurrency(contract.valor_disponivel)}
-                    </td>
-                    <td className="px-3 py-4">
-                      <span
-                        className={clsx(
-                          "inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize",
-                          statusStyles[contract.status ?? ""] ?? "bg-neutral-100 text-neutral-600"
-                        )}
-                      >
-                        {getStatusLabel(contract.status)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-4 text-right">
-                      <Tooltip.Provider delayDuration={150}>
-                        <div className="flex flex-col items-end gap-1">
-                          <Tooltip.Root>
-                            <Tooltip.Trigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => openEditForm(contract)}
-                                aria-label={`Editar contrato ${contract.numero_contrato}`}
-                                disabled={supabaseUnavailable}
-                              >
-                                <Pencil className="size-4" />
-                              </Button>
-                            </Tooltip.Trigger>
-                            <Tooltip.Portal>
-                              <Tooltip.Content
-                                side="top"
-                                sideOffset={6}
-                                className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-                              >
-                                Editar contrato
-                                <Tooltip.Arrow className="fill-white" />
-                              </Tooltip.Content>
-                            </Tooltip.Portal>
-                          </Tooltip.Root>
-                          <Tooltip.Root>
-                            <Tooltip.Trigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-danger"
-                                onClick={() => openDeleteDialog(contract)}
-                                aria-label={`Excluir contrato ${contract.numero_contrato}`}
-                                disabled={supabaseUnavailable}
-                              >
-                                <Trash2 className="size-4" />
-                              </Button>
-                            </Tooltip.Trigger>
-                            <Tooltip.Portal>
-                              <Tooltip.Content
-                                side="top"
-                                sideOffset={6}
-                                className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-                              >
-                                Excluir contrato
-                                <Tooltip.Arrow className="fill-white" />
-                              </Tooltip.Content>
-                            </Tooltip.Portal>
-                          </Tooltip.Root>
-                        </div>
-                      </Tooltip.Provider>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+                    </Tooltip.Provider>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+
+  const renderClientsSection = () => (
+    <Card>
+      <div className="flex flex-col gap-3 border-b border-neutral-100 pb-4 md:flex-row md:items-end md:justify-between">
+        <div className="w-full md:max-w-md">
+          <label className="text-sm font-medium text-neutral-600">Buscar cliente</label>
+          <input
+            type="text"
+            placeholder="Ex.: Nome ou documento"
+            className="mt-2 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 focus:border-brand-500 focus:outline-none"
+            value={clientSearchTerm}
+            onChange={(event) => setClientSearchTerm(event.target.value)}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => void loadClientsOnly()}>
+            <RefreshCcw className="mr-2 size-4" />
+            Atualizar clientes
+          </Button>
+          <Button size="sm" onClick={openCreateClientForm} disabled={supabaseUnavailable}>
+            <Plus className="mr-2 size-4" />
+            Novo cliente
+          </Button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex h-48 items-center justify-center text-sm text-neutral-500">
+          Carregando clientes...
+        </div>
+      ) : filteredClients.length === 0 ? (
+        <div className="flex h-32 flex-col items-center justify-center gap-2 text-center text-sm text-neutral-500">
+          <p>Nenhum cliente encontrado.</p>
+          {clientSearchTerm ? (
+            <Button variant="secondary" size="sm" onClick={() => setClientSearchTerm("")}>
+              Limpar busca
+            </Button>
+          ) : (
+            <Button onClick={openCreateClientForm} disabled={supabaseUnavailable}>
+              <Plus className="mr-2 size-4" />
+              Cadastrar cliente
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-neutral-100 text-sm">
+            <thead>
+              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                <th className="p-3">Cliente</th>
+                <th className="p-3">Documento</th>
+                <th className="p-3">Criado em</th>
+                <th className="p-3 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100 text-neutral-700">
+              {filteredClients.map((client) => (
+                <tr key={client.id}>
+                  <td className="px-3 py-4 text-neutral-900">{client.nome}</td>
+                  <td className="px-3 py-4 text-neutral-700">
+                    {client.documento ?? "Documento não informado"}
+                  </td>
+                  <td className="px-3 py-4 text-neutral-700">
+                    {client.criado_em ? format(parseISO(client.criado_em), "dd/MM/yyyy") : "—"}
+                  </td>
+                  <td className="px-3 py-4 text-right">
+                    <Tooltip.Provider delayDuration={150}>
+                      <div className="flex justify-end gap-2">
+                        <Tooltip.Root>
+                          <Tooltip.Trigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              type="button"
+                              onClick={() => openEditClientForm(client)}
+                              disabled={supabaseUnavailable}
+                            >
+                              <Pencil className="mr-2 size-4" />
+                              Editar
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content
+                              side="top"
+                              sideOffset={6}
+                              className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                            >
+                              Editar cliente
+                              <Tooltip.Arrow className="fill-white" />
+                            </Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                        <Tooltip.Root>
+                          <Tooltip.Trigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              type="button"
+                              onClick={() => openDeleteClientDialog(client)}
+                              disabled={supabaseUnavailable}
+                              aria-label="Excluir cliente"
+                              className="text-danger"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content
+                              side="top"
+                              sideOffset={6}
+                              className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                            >
+                              Excluir cliente
+                              <Tooltip.Arrow className="fill-white" />
+                            </Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                      </div>
+                    </Tooltip.Provider>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Contratos do Cliente"
+        subtitle="Gerencie contratos, vigências e valores negociados com clientes."
+      />
+
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant={activeTab === "contracts" ? "secondary" : "ghost"}
+          onClick={() => setActiveTab("contracts")}
+          type="button"
+        >
+          Contratos
+        </Button>
+        <Button
+          variant={activeTab === "clients" ? "secondary" : "ghost"}
+          onClick={() => setActiveTab("clients")}
+          type="button"
+        >
+          Clientes
+        </Button>
+      </div>
+
+      {activeTab === "contracts" ? renderContractsSection() : renderClientsSection()}
 
       <Dialog.Root open={formOpen} onOpenChange={handleFormDialogChange}>
         <Dialog.Portal>
@@ -1006,6 +1337,129 @@ export default function ContratosPage() {
                 </Button>
               </div>
             </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      <Dialog.Root open={clientFormOpen} onOpenChange={handleClientFormDialogChange}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-neutral-900/60 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(480px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-neutral-100 bg-white p-6 shadow-card">
+            <div className="flex items-start justify-between">
+              <Dialog.Title className="text-lg font-semibold text-neutral-900">
+                {clientFormMode === "create" ? "Novo cliente" : "Editar cliente"}
+              </Dialog.Title>
+              <Dialog.Close asChild>
+                <Button variant="ghost" size="icon" aria-label="Fechar formulário de cliente">
+                  <X className="size-4" />
+                </Button>
+              </Dialog.Close>
+            </div>
+
+            <form className="mt-4 space-y-4" onSubmit={handleClientSubmit}>
+              {clientFormErrors.general ? (
+                <div className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
+                  {clientFormErrors.general}
+                </div>
+              ) : null}
+
+              <div className="space-y-1.5">
+                <label htmlFor="cliente_nome" className="text-sm font-medium text-neutral-700">
+                  Nome do cliente
+                </label>
+                <input
+                  id="cliente_nome"
+                  name="nome"
+                  value={clientFormState.nome}
+                  onChange={handleClientInputChange}
+                  className={inputClassName(Boolean(clientFormErrors.nome))}
+                  placeholder="Ex.: ACME Corp"
+                />
+                {clientFormErrors.nome ? (
+                  <p className="text-xs text-danger">{clientFormErrors.nome}</p>
+                ) : null}
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="cliente_documento" className="text-sm font-medium text-neutral-700">
+                  Documento
+                </label>
+                <input
+                  id="cliente_documento"
+                  name="documento"
+                  value={clientFormState.documento}
+                  onChange={handleClientInputChange}
+                  className={inputClassName(Boolean(clientFormErrors.documento))}
+                  placeholder="CNPJ/CPF (opcional)"
+                />
+                {clientFormErrors.documento ? (
+                  <p className="text-xs text-danger">{clientFormErrors.documento}</p>
+                ) : (
+                  <p className="text-xs text-neutral-500">Campo opcional.</p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <Dialog.Close asChild>
+                  <Button type="button" variant="ghost" onClick={resetClientFormState}>
+                    Cancelar
+                  </Button>
+                </Dialog.Close>
+                <Button type="submit" disabled={clientSubmitting}>
+                  {clientSubmitting
+                    ? clientFormMode === "create"
+                      ? "Salvando..."
+                      : "Atualizando..."
+                    : clientFormMode === "create"
+                      ? "Salvar cliente"
+                      : "Atualizar cliente"}
+                </Button>
+              </div>
+            </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      <Dialog.Root open={clientDeleteOpen} onOpenChange={setClientDeleteOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-neutral-900/60 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(420px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-neutral-100 bg-white p-6 shadow-card">
+            <div className="flex items-start justify-between">
+              <Dialog.Title className="text-lg font-semibold text-neutral-900">
+                Excluir cliente
+              </Dialog.Title>
+              <Dialog.Close asChild>
+                <Button variant="ghost" size="icon" aria-label="Fechar confirmação cliente">
+                  <X className="size-4" />
+                </Button>
+              </Dialog.Close>
+            </div>
+            <Dialog.Description className="mt-1 text-sm text-neutral-500">
+              Confirma a exclusão do cliente{" "}
+              <span className="font-semibold text-neutral-800">{pendingClient?.nome}</span>? Essa
+              ação não pode ser desfeita.
+            </Dialog.Description>
+
+            {clientDeleteError ? (
+              <div className="mt-4 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
+                {clientDeleteError}
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <Dialog.Close asChild>
+                <Button type="button" variant="ghost" onClick={() => setPendingClient(null)}>
+                  Cancelar
+                </Button>
+              </Dialog.Close>
+              <Button
+                variant="destructive"
+                onClick={handleClientDelete}
+                disabled={clientDeleteLoading || !pendingClient}
+              >
+                {clientDeleteLoading ? "Excluindo..." : "Excluir"}
+              </Button>
+            </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

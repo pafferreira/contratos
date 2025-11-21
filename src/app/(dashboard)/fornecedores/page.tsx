@@ -1257,19 +1257,13 @@ export default function ContratosFornecedorPage() {
 
       )}
       <Dialog.Root open={formOpen} onOpenChange={handleFormDialogChange}>
-
         <Dialog.Portal>
-
           <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
-
           <Dialog.Content
-
-            className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4"
+            className="fixed left-1/2 top-1/2 z-50 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl focus:outline-none"
           >
 
-            <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
-
-              <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between">
 
                 <div>
 
@@ -1560,8 +1554,6 @@ export default function ContratosFornecedorPage() {
 
               </form>
 
-            </div>
-
           </Dialog.Content>
 
         </Dialog.Portal>
@@ -1571,8 +1563,9 @@ export default function ContratosFornecedorPage() {
       <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
-          <Dialog.Content className="fixed inset-0 flex items-center justify-center p-4">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <Dialog.Content
+            className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl focus:outline-none"
+          >
               <Dialog.Title className="text-lg font-semibold text-neutral-900">
                 Excluir contrato
               </Dialog.Title>
@@ -1605,7 +1598,6 @@ export default function ContratosFornecedorPage() {
                   {deleteLoading ? "Excluindo..." : "Excluir"}
                 </Button>
               </div>
-            </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
