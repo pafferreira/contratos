@@ -220,6 +220,7 @@ export default function ContratosPage() {
   const [clientDeleteError, setClientDeleteError] = useState<string | null>(null);
   const [clientDeleteLoading, setClientDeleteLoading] = useState(false);
   const [clientSearchTerm, setClientSearchTerm] = useState("");
+  const [clientsRefreshing, setClientsRefreshing] = useState(false);
 
   const clientsMap = useMemo(() => {
     const map = new Map<string, ClientRow>();
@@ -260,6 +261,7 @@ export default function ContratosPage() {
       setClients([]);
       return [];
     }
+    setClientsRefreshing(true);
     const { data, error: clientError } = await supabase
       .from(CLIENTS_TABLE)
       .select("id, nome, documento, criado_em")
@@ -270,9 +272,11 @@ export default function ContratosPage() {
         console.error("Erro ao carregar clientes:", clientError);
       }
       setError(clientError.message ?? "Não foi possível carregar os clientes.");
+      setClientsRefreshing(false);
       return [];
     }
     setClients(data ?? []);
+    setClientsRefreshing(false);
     return data ?? [];
   }, [supabase]);
 
@@ -655,62 +659,7 @@ export default function ContratosPage() {
   };
 
   const renderContractsSection = () => (
-    <Card>
-      <div className="flex flex-col gap-4 border-b border-neutral-100 pb-4 md:flex-row md:items-end md:gap-6">
-        <div className="w-full md:flex-1">
-          <label className="text-sm font-medium text-neutral-600">
-            Buscar por número ou cliente
-          </label>
-          <input
-            type="text"
-            placeholder="Ex.: CLT-2024-01 ou ACME Corp"
-            className="mt-2 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 focus:border-brand-500 focus:outline-none"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-          />
-        </div>
-
-        <div className="flex flex-col gap-2 md:w-auto">
-          <span className="text-sm font-medium text-neutral-600">Visualização</span>
-          <div className="flex rounded-lg border border-neutral-200 bg-white p-1">
-            <Button
-              type="button"
-              size="icon"
-              variant={viewMode === "cards" ? "secondary" : "ghost"}
-              onClick={() => setViewMode("cards")}
-              aria-pressed={viewMode === "cards"}
-            >
-              <LayoutGrid className="size-4" />
-            </Button>
-            <Button
-              type="button"
-              size="icon"
-              variant={viewMode === "list" ? "secondary" : "ghost"}
-              onClick={() => setViewMode("list")}
-              aria-pressed={viewMode === "list"}
-            >
-              <List className="size-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2 md:w-auto md:justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={loading || refreshing}
-          >
-            <RefreshCcw className="mr-2 size-4" />
-            {refreshing ? "Atualizando..." : "Atualizar"}
-          </Button>
-          <Button onClick={openCreateForm} disabled={supabaseUnavailable}>
-            <Plus className="mr-2 size-4" />
-            Novo contrato
-          </Button>
-        </div>
-      </div>
-
+    <Card className="space-y-6">
       {loading ? (
         <div className="flex h-48 items-center justify-center text-sm text-neutral-500">
           Carregando contratos...
@@ -965,30 +914,7 @@ export default function ContratosPage() {
   );
 
   const renderClientsSection = () => (
-    <Card>
-      <div className="flex flex-col gap-3 border-b border-neutral-100 pb-4 md:flex-row md:items-end md:justify-between">
-        <div className="w-full md:max-w-md">
-          <label className="text-sm font-medium text-neutral-600">Buscar cliente</label>
-          <input
-            type="text"
-            placeholder="Ex.: Nome ou documento"
-            className="mt-2 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 focus:border-brand-500 focus:outline-none"
-            value={clientSearchTerm}
-            onChange={(event) => setClientSearchTerm(event.target.value)}
-          />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={() => void loadClientsOnly()}>
-            <RefreshCcw className="mr-2 size-4" />
-            Atualizar clientes
-          </Button>
-          <Button size="sm" onClick={openCreateClientForm} disabled={supabaseUnavailable}>
-            <Plus className="mr-2 size-4" />
-            Novo cliente
-          </Button>
-        </div>
-      </div>
-
+    <Card className="space-y-6">
       {loading ? (
         <div className="flex h-48 items-center justify-center text-sm text-neutral-500">
           Carregando clientes...
@@ -1092,6 +1018,95 @@ export default function ContratosPage() {
     </Card>
   );
 
+  const renderToolbar = () => {
+    if (activeTab === "contracts") {
+      return (
+        <div className="flex flex-col gap-4 rounded-xl border border-neutral-100 bg-white/80 p-4 shadow-sm md:flex-row md:items-end md:gap-6">
+          <div className="w-full md:flex-1">
+            <label className="text-sm font-medium text-neutral-600">
+              Buscar por número ou cliente
+            </label>
+            <input
+              type="text"
+              placeholder="Ex.: CLT-2024-01 ou ACME Corp"
+              className="mt-2 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 focus:border-brand-500 focus:outline-none"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-2 md:w-auto">
+            <span className="text-sm font-medium text-neutral-600">Visualização</span>
+            <div className="flex rounded-lg border border-neutral-200 bg-white p-1">
+              <Button
+                type="button"
+                size="icon"
+                variant={viewMode === "cards" ? "secondary" : "ghost"}
+                onClick={() => setViewMode("cards")}
+                aria-pressed={viewMode === "cards"}
+              >
+                <LayoutGrid className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant={viewMode === "list" ? "secondary" : "ghost"}
+                onClick={() => setViewMode("list")}
+                aria-pressed={viewMode === "list"}
+              >
+                <List className="size-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 md:flex-row md:items-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={loading || refreshing}
+            >
+              <RefreshCcw className="mr-2 size-4" />
+              {refreshing ? "Atualizando..." : "Atualizar"}
+            </Button>
+            <Button onClick={openCreateForm} disabled={supabaseUnavailable}>
+              <Plus className="mr-2 size-4" />
+              Novo contrato
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-4 rounded-xl border border-neutral-100 bg-white/80 p-4 shadow-sm md:flex-row md:items-end md:justify-between">
+        <div className="w-full md:flex-1">
+          <label className="text-sm font-medium text-neutral-600">Buscar cliente</label>
+          <input
+            type="text"
+            placeholder="Ex.: Nome ou documento"
+            className="mt-2 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 focus:border-brand-500 focus:outline-none"
+            value={clientSearchTerm}
+            onChange={(event) => setClientSearchTerm(event.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-2 md:flex-row md:items-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void loadClientsOnly()}
+            disabled={clientsRefreshing}
+          >
+            <RefreshCcw className="mr-2 size-4" />
+            {clientsRefreshing ? "Atualizando..." : "Atualizar clientes"}
+          </Button>
+          <Button size="sm" onClick={openCreateClientForm} disabled={supabaseUnavailable}>
+            <Plus className="mr-2 size-4" />
+            Novo cliente
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
 
   return (
     <div className="space-y-6">
@@ -1116,6 +1131,8 @@ export default function ContratosPage() {
           Clientes
         </Button>
       </div>
+
+      {renderToolbar()}
 
       {activeTab === "contracts" ? renderContractsSection() : renderClientsSection()}
 
