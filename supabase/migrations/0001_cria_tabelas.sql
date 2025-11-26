@@ -30,7 +30,7 @@ create table if not exists public."C_ESPECIFICACOES_SERVICO" (
   unique (contrato_id, numero_especificacao)
 );
 
-create table if not exists public."C_SOLICITACOES_SERVICO" (
+create table if not exists public."C_REQUISICOES_SERVICO" (
   id uuid primary key default gen_random_uuid(),
   especificacao_id uuid references public."C_ESPECIFICACOES_SERVICO"(id) on delete cascade,
   codigo_rs text not null,
@@ -52,7 +52,7 @@ create table if not exists public."C_SOLICITACOES_SERVICO" (
 
 create table if not exists public."C_METRICAS_SOLICITACAO" (
   id uuid primary key default gen_random_uuid(),
-  solicitacao_id uuid references public."C_SOLICITACOES_SERVICO"(id) on delete cascade,
+  solicitacao_id uuid references public."C_REQUISICOES_SERVICO"(id) on delete cascade,
   tipo_metrica text check (tipo_metrica in ('USH','USD','PF','PARCELA_FIXA')),
   quantidade numeric(10,2) not null,
   horas_unidade numeric(10,2),
@@ -113,7 +113,7 @@ create table if not exists public."C_ORDENS_SERVICO" (
 
 create table if not exists public."C_ALOCACOES_RECURSOS" (
   id uuid primary key default gen_random_uuid(),
-  solicitacao_id uuid references public."C_SOLICITACOES_SERVICO"(id) on delete cascade,
+  solicitacao_id uuid references public."C_REQUISICOES_SERVICO"(id) on delete cascade,
   recurso_fornecedor_id uuid references public."C_RECURSOS_FORNECEDOR"(id),
   ordem_servico_id uuid references public."C_ORDENS_SERVICO"(id),
   papel text,
@@ -137,7 +137,7 @@ select
   sum(tm.valor_total) as orcamento_solicitacao,
   sum(te.horas * rp.valor_hora) as custo_fornecedor,
   sum(te.horas) as horas_totais
-from public."C_SOLICITACOES_SERVICO" sr
+from public."C_REQUISICOES_SERVICO" sr
 left join public."C_METRICAS_SOLICITACAO" tm on tm.solicitacao_id = sr.id
 left join public."C_ALOCACOES_RECURSOS" ra on ra.solicitacao_id = sr.id
 left join public."C_RECURSOS_FORNECEDOR" sres on sres.id = ra.recurso_fornecedor_id
