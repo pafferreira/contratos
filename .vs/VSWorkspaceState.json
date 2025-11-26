@@ -1,0 +1,13 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\src",
+    "\\src\\app",
+    "\\src\\app\\(auth)",
+    "\\src\\app\\(auth)\\auth",
+    "\\src\\app\\(auth)\\signin",
+    "\\src\\app\\(dashboard)",
+    "\\src\\app\\(dashboard)\\contratos"
+  ],
+  "PreviewInSolutionExplorer": false
+}
