@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, LayoutDashboard, LogOut } from "lucide-react";
-import { useState } from "react";
+import { Menu, LayoutDashboard, LogOut, PanelRightOpen, PanelRightClose } from "lucide-react";
+import { useMemo, useState } from "react";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import { DASHBOARD_NAV } from "@/lib/constants/navigation";
 import { Button } from "@/components/ui/button";
 import { PersonaSwitcher } from "@/components/navigation/persona-switcher";
@@ -17,45 +18,73 @@ type AppShellProps = {
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const isCollapsed = useMemo(() => collapsed && !mobileOpen, [collapsed, mobileOpen]);
 
   return (
     <div className="flex min-h-screen bg-neutral-25">
       <aside
         className={clsx(
-          "fixed inset-y-0 z-40 w-72 border-r border-neutral-100 bg-white px-4 py-6 transition-transform md:static md:translate-x-0",
+          "fixed inset-y-0 z-40 border-r border-neutral-100 bg-white px-3 py-6 transition-transform md:static md:translate-x-0",
+          isCollapsed ? "w-16" : "w-55",
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
       >
-        <div className="flex items-center gap-2 px-2 text-lg font-semibold text-neutral-700">
-          <LayoutDashboard size={20} />
-          <span>Inventário de Contratos</span>
+        <div
+          className={clsx(
+            "flex items-center justify-between px-1",
+            isCollapsed ? "justify-center" : ""
+          )}
+        >
+          <div className="flex items-center gap-2 text-lg font-semibold text-neutral-700">
+            <LayoutDashboard size={20} />
+            <span className={clsx("truncate", isCollapsed && "hidden")}>Inventário de Contratos</span>
+          </div>
         </div>
-        <nav className="mt-6 space-y-1">
-          {DASHBOARD_NAV.map((item) => {
-            const active =
-              item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={clsx(
-                  "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-brand-50 text-brand-700"
-                    : "text-neutral-600 hocus:bg-neutral-100 hocus:text-neutral-900"
-                )}
-                onClick={() => setMobileOpen(false)}
-              >
-                <span>{item.title}</span>
-                <span className="text-xs uppercase tracking-wide text-neutral-400">
-                  {item.icon}
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
+        <Tooltip.Provider delayDuration={150} disableHoverableContent>
+          <nav className="mt-6 space-y-1">
+            {DASHBOARD_NAV.map((item) => {
+              const active =
+                item.href === "/dashboard"
+                  ? pathname === "/dashboard"
+                  : pathname.startsWith(item.href);
+              const Icon = item.icon;
+              return (
+                <Tooltip.Root key={item.href} delayDuration={50}>
+                  <Tooltip.Trigger asChild>
+                    <Link
+                      href={item.href}
+                      className={clsx(
+                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        active
+                          ? "bg-brand-50 text-brand-700"
+                          : "text-neutral-600 hocus:bg-neutral-100 hocus:text-neutral-900",
+                        isCollapsed ? "justify-center" : ""
+                      )}
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <Icon
+                        className={clsx("shrink-0", active ? "text-brand-700" : "text-neutral-500")}
+                        size={18}
+                      />
+                      <span className={clsx("truncate", isCollapsed && "hidden")}>{item.title}</span>
+                    </Link>
+                  </Tooltip.Trigger>
+                  <Tooltip.Portal>
+                    <Tooltip.Content
+                      side="right"
+                      sideOffset={10}
+                      className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white shadow-lg"
+                    >
+                      {item.title}
+                      <Tooltip.Arrow className="fill-neutral-900" />
+                    </Tooltip.Content>
+                  </Tooltip.Portal>
+                </Tooltip.Root>
+              );
+            })}
+          </nav>
+        </Tooltip.Provider>
       </aside>
       <div className="flex flex-1 flex-col">
         <header className="sticky top-0 z-30 border-b border-neutral-100 bg-white/70 backdrop-blur">
@@ -69,6 +98,15 @@ export function AppShell({ children }: AppShellProps) {
                 aria-label="Alternar menu"
               >
                 <Menu size={20} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden md:inline-flex"
+                onClick={() => setCollapsed((prev) => !prev)}
+                aria-label={isCollapsed ? "Expandir menu" : "Recolher menu"}
+              >
+                {isCollapsed ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
               </Button>
               <PersonaSwitcher />
             </div>

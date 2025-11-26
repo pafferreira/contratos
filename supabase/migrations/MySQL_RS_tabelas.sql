@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS `C_SOLICITACOES_SERVICO` (
   `responsavel_bu` VARCHAR(255),
   `justificativa` TEXT,
   `notas_aceite` TEXT,
-  `status` ENUM('planejada','em_execucao','homologacao','encerrada'),
+  `status` ENUM('planejada','em_execucao','homologacao','encerrada') DEFAULT 'planejada',
   UNIQUE KEY `uk_solicitacao_codigo` (`especificacao_id`, `codigo_rs`),
   CONSTRAINT `fk_solicitacao_especificacao` FOREIGN KEY (`especificacao_id`) REFERENCES `C_ESPECIFICACOES_SERVICO` (`id`) ON DELETE CASCADE
 );

@@ -46,7 +46,7 @@ create table if not exists public."C_REQUISICOES_SERVICO" (
   responsavel_bu text,
   justificativa text,
   notas_aceite text,
-  status text check (status in ('planejada','em_execucao','homologacao','encerrada')),
+  status text default 'planejada' check (status in ('planejada','em_execucao','homologacao','encerrada')),
   unique (especificacao_id, codigo_rs)
 );
 
