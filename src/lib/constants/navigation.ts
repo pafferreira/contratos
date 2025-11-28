@@ -6,7 +6,8 @@ import {
   LayoutDashboard,
   Users,
   Waypoints,
-  FileText
+  FileText,
+  Clock
 } from "lucide-react";
 
 export type NavItem = {
@@ -21,5 +22,6 @@ export const DASHBOARD_NAV: NavItem[] = [
   { title: "ESP & RS", href: "/rs", icon: Waypoints },
   { title: "Projetos", href: "/projetos", icon: FolderGit2 },
   { title: "Contratos Fornecedor", href: "/fornecedores", icon: HandCoins },
-  { title: "Recursos ATE", href: "/recursos", icon: Users }
+  { title: "Recursos ATE", href: "/recursos", icon: Users },
+  { title: "Apontamento de Horas", href: "/apontamento", icon: Clock }
 ];

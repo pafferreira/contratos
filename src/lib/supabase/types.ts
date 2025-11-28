@@ -18,9 +18,9 @@ export type TablesInsert<T> = T extends { Row: infer R; Insert: infer I }
 
   ? I extends undefined
 
-    ? R
+  ? R
 
-    : I
+  : I
 
   : never;
 
@@ -30,9 +30,9 @@ export type TablesUpdate<T> = T extends { Row: infer R; Update: infer U }
 
   ? U extends undefined
 
-    ? R
+  ? R
 
-    : U
+  : U
 
   : never;
 
@@ -302,6 +302,70 @@ export type Database = {
           nome_completo?: string;
           email?: string | null;
           ativo?: boolean | null;
+        };
+      },
+      "C_ALOCACOES_RECURSOS": {
+        Row: {
+          id: string;
+          solicitacao_id: string | null;
+          recurso_fornecedor_id: string | null;
+          ordem_servico_id: string | null;
+          papel: string | null;
+          inicio_alocacao: string | null;
+          fim_alocacao: string | null;
+        };
+        Insert: {
+          id?: string;
+          solicitacao_id?: string | null;
+          recurso_fornecedor_id?: string | null;
+          ordem_servico_id?: string | null;
+          papel?: string | null;
+          inicio_alocacao?: string | null;
+          fim_alocacao?: string | null;
+        };
+        Update: {
+          id?: string;
+          solicitacao_id?: string | null;
+          recurso_fornecedor_id?: string | null;
+          ordem_servico_id?: string | null;
+          papel?: string | null;
+          inicio_alocacao?: string | null;
+          fim_alocacao?: string | null;
+        };
+      },
+      "C_APONTAMENTOS_TEMPO": {
+        Row: {
+          id: string;
+          alocacao_id: string | null;
+          data_trabalho: string;
+          horas: number | null; // Generated column might be null if inputs are null
+          hora_inicio: string | null;
+          hora_fim: string | null;
+          aprovado: boolean | null;
+          mes_faturamento: string | null;
+          descricao: string | null;
+        };
+        Insert: {
+          id?: string;
+          alocacao_id?: string | null;
+          data_trabalho: string;
+          // horas is generated, cannot insert
+          hora_inicio?: string | null;
+          hora_fim?: string | null;
+          aprovado?: boolean | null;
+          mes_faturamento?: string | null;
+          descricao?: string | null;
+        };
+        Update: {
+          id?: string;
+          alocacao_id?: string | null;
+          data_trabalho?: string;
+          // horas is generated, cannot update
+          hora_inicio?: string | null;
+          hora_fim?: string | null;
+          aprovado?: boolean | null;
+          mes_faturamento?: string | null;
+          descricao?: string | null;
         };
       };
 
