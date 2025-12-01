@@ -219,12 +219,13 @@ export default function ApontamentoPage() {
                     ),
                     alocacoes:C_ALOCACOES_RECURSOS (
                         id,
-                        solicitacao_id,
-                        recurso_fornecedor_id,
+                                solicitacao_id,
+                                recurso_fornecedor_id,
                         ordem_servico_id,
                         papel,
                         inicio_alocacao,
                         fim_alocacao,
+                        solicitacao:C_REQUISICOES_SERVICO ( codigo_rs, titulo ),
                         apontamentos:C_APONTAMENTOS_TEMPO (
                             id,
                             alocacao_id,
@@ -254,12 +255,13 @@ export default function ApontamentoPage() {
                             const horasTotal = hoursCalc.total ?? entry.horas ?? 0;
                             const horasMinutos = hoursCalc.totalMinutes ?? (entry.horas ? Math.round(entry.horas * 60) : null);
                             const projetoLabel = getProjectTitle(alloc);
+                            const projetoTitulo = alloc.solicitacao?.titulo ?? null;
 
                             allEntries.push({
                                 id: entry.id,
                                 recurso_id: res.id,
                                 alocacao_id: alloc.id,
-                                projeto: projetoLabel,
+                                projeto: projetoTitulo ?? projetoLabel,
                                 data: entry.data_trabalho,
                                 horas: horasTotal,
                                 horasEmMinutos: horasMinutos,
@@ -746,7 +748,8 @@ export default function ApontamentoPage() {
                                                 : "Selecione um recurso primeiro"}
                                         </option>
                                         {alocacoesDoRecursoSelecionado.map((alloc) => {
-                                            const projectName = getProjectTitle(alloc);
+                                            const projectName =
+                                                alloc.solicitacao?.titulo || getProjectTitle(alloc);
                                             return (
                                                 <option key={alloc.id} value={alloc.id}>
                                                     {projectName}
