@@ -37,8 +37,11 @@ type TimeEntry = {
     id: string;
     recurso_id: string;
     alocacao_id: string;
+    projeto?: string | null;
     data: string;
     horas: number | null;
+    horasEmMinutos?: number | null;
+    horasDescricao?: string;
     hora_inicio: string | null;
     hora_fim: string | null;
     descricao: string;
@@ -55,6 +58,7 @@ type ResourceWithEntries = ResourceRow & {
 
 type TimeEntryFormState = {
     recurso_id: string;
+    alocacao_id: string;
     data: string;
     hora_inicio: string;
     hora_fim: string;
@@ -67,6 +71,7 @@ type FormErrors = Partial<Record<keyof TimeEntryFormState, string>> & {
 
 const EMPTY_FORM_STATE: TimeEntryFormState = {
     recurso_id: "",
+    alocacao_id: "",
     data: new Date().toISOString().split("T")[0],
     hora_inicio: "",
     hora_fim: "",
@@ -75,6 +80,7 @@ const EMPTY_FORM_STATE: TimeEntryFormState = {
 
 const TimeEntryFormSchema = z.object({
     recurso_id: z.string().trim().min(1, "Selecione um recurso"),
+    alocacao_id: z.string().trim().min(1, "Selecione um projeto"),
     data: z.string().trim().min(1, "Informe a data"),
     hora_inicio: z.string().trim().min(1, "Informe a hora de início"),
     hora_fim: z.string().trim().min(1, "Informe a hora de fim"),
@@ -88,6 +94,60 @@ const TimeEntryFormSchema = z.object({
     message: "Hora fim deve ser maior que hora início",
     path: ["hora_fim"]
 });
+
+function calculateHours(horaInicio?: string | null, horaFim?: string | null) {
+    if (!horaInicio || !horaFim) {
+        return { total: null, description: "Sem cálculo: hora inicial/final não informada" };
+    }
+    const [startHour, startMinute] = horaInicio.split(":").map(Number);
+    const [endHour, endMinute] = horaFim.split(":").map(Number);
+    if (
+        Number.isNaN(startHour) ||
+        Number.isNaN(startMinute) ||
+        Number.isNaN(endHour) ||
+        Number.isNaN(endMinute)
+    ) {
+        return { total: null, description: "Horas inválidas" };
+    }
+    const start = startHour * 60 + startMinute;
+    const end = endHour * 60 + endMinute;
+    if (end <= start) {
+        return { total: null, description: "Hora final deve ser maior que a inicial" };
+    }
+    const totalMinutesRaw = end - start;
+    const lunchBreakMinutes = totalMinutesRaw > 60 ? 60 : 0;
+    const totalMinutes = Math.max(totalMinutesRaw - lunchBreakMinutes, 0);
+    const totalHours = Number((totalMinutes / 60).toFixed(2));
+    const totalDisplay = formatMinutesToHours(totalMinutes);
+    return {
+        total: totalHours,
+        totalMinutes,
+        description: `${horaInicio} - ${horaFim} (-1h almoço) = ${totalDisplay}`
+    };
+}
+
+function getProjectTitle(alloc: any) {
+    // Prefer a joined title if available, otherwise fall back to IDs
+    return (
+        alloc?.solicitacao?.titulo ||
+        alloc?.solicitacao_id ||
+        alloc?.ordem_servico_id ||
+        "Projeto não informado"
+    );
+}
+
+function formatMinutesToHours(totalMinutes?: number | null) {
+    if (typeof totalMinutes !== "number" || Number.isNaN(totalMinutes)) return "0h00";
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = Math.round(totalMinutes % 60);
+    return `${String(hours)}h${String(minutes).padStart(2, "0")}`;
+}
+
+function formatHoursDisplay(hours?: number | null) {
+    if (typeof hours !== "number" || Number.isNaN(hours)) return "0h00";
+    const totalMinutes = Math.round(hours * 60);
+    return formatMinutesToHours(totalMinutes);
+}
 
 function inputClassName(hasError?: boolean) {
     return clsx(
@@ -126,6 +186,12 @@ export default function ApontamentoPage() {
         }
         return null;
     }, [activeEntryId, resources]);
+
+    const alocacoesDoRecursoSelecionado = useMemo(() => {
+        if (!formState.recurso_id) return [];
+        const res = resources.find((r) => r.id === formState.recurso_id);
+        return res?.alocacoes ?? [];
+    }, [formState.recurso_id, resources]);
 
     const loadData = useCallback(async () => {
         if (!supabase) {
@@ -184,12 +250,20 @@ export default function ApontamentoPage() {
                     const entries = alloc.apontamentos || [];
                     entries.forEach((entry: any) => {
                         if (entry.data_trabalho >= startDate && entry.data_trabalho <= endDate) {
+                            const hoursCalc = calculateHours(entry.hora_inicio, entry.hora_fim);
+                            const horasTotal = hoursCalc.total ?? entry.horas ?? 0;
+                            const horasMinutos = hoursCalc.totalMinutes ?? (entry.horas ? Math.round(entry.horas * 60) : null);
+                            const projetoLabel = getProjectTitle(alloc);
+
                             allEntries.push({
                                 id: entry.id,
                                 recurso_id: res.id,
                                 alocacao_id: alloc.id,
+                                projeto: projetoLabel,
                                 data: entry.data_trabalho,
-                                horas: entry.horas,
+                                horas: horasTotal,
+                                horasEmMinutos: horasMinutos,
+                                horasDescricao: hoursCalc.description,
                                 hora_inicio: entry.hora_inicio,
                                 hora_fim: entry.hora_fim,
                                 descricao: entry.descricao || "",
@@ -269,6 +343,7 @@ export default function ApontamentoPage() {
         setActiveEntryId(entry.id);
         setFormState({
             recurso_id: recursoId,
+            alocacao_id: entry.alocacao_id,
             data: entry.data,
             hora_inicio: entry.hora_inicio || "",
             hora_fim: entry.hora_fim || "",
@@ -282,6 +357,10 @@ export default function ApontamentoPage() {
         event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
     ) => {
         const { name, value } = event.target;
+        if (name === "recurso_id") {
+            setFormState((prev) => ({ ...prev, recurso_id: value, alocacao_id: "" }));
+            return;
+        }
         setFormState((prev) => ({ ...prev, [name]: value }));
     };
 
@@ -313,11 +392,21 @@ export default function ApontamentoPage() {
                 throw new Error("Recurso não encontrado");
             }
 
-            const allocation = selectedResource.alocacoes?.[0];
+            const allocation = selectedResource.alocacoes?.find((a) => a.id === formState.alocacao_id);
 
             if (!allocation) {
                 setFormErrors({
                     general: "Este recurso não possui alocação ativa. Não é possível lançar horas."
+                });
+                setSubmitting(false);
+                return;
+            }
+
+            const hoursCalc = calculateHours(formState.hora_inicio, formState.hora_fim);
+            if (hoursCalc.total === null) {
+                setFormErrors({
+                    hora_fim: hoursCalc.description.includes("final") ? hoursCalc.description : undefined,
+                    general: "Não foi possível calcular as horas. Verifique início e fim."
                 });
                 setSubmitting(false);
                 return;
@@ -498,11 +587,18 @@ export default function ApontamentoPage() {
                                                                         {new Date(entry.data + "T00:00:00").toLocaleDateString("pt-BR")}
                                                                     </span>
                                                                     <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-700">
-                                                                        {entry.horas?.toFixed(2) || "0.00"}h
+                                                                        {entry.horasEmMinutos
+                                                                            ? formatMinutesToHours(entry.horasEmMinutos)
+                                                                            : formatHoursDisplay(entry.horas)}
                                                                     </span>
                                                                     <span className="text-xs text-neutral-500">
                                                                         ({entry.hora_inicio?.slice(0, 5)} - {entry.hora_fim?.slice(0, 5)})
                                                                     </span>
+                                                                    {entry.projeto ? (
+                                                                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
+                                                                            Projeto: {entry.projeto}
+                                                                        </span>
+                                                                    ) : null}
                                                                     {entry.aprovado && (
                                                                         <Tooltip>
                                                                             <TooltipTrigger asChild>
@@ -516,6 +612,11 @@ export default function ApontamentoPage() {
                                                                         </Tooltip>
                                                                     )}
                                                                 </div>
+                                                                {entry.horasDescricao ? (
+                                                                    <p className="text-xs text-neutral-500">
+                                                                        {entry.horasDescricao}
+                                                                    </p>
+                                                                ) : null}
                                                                 {entry.descricao && (
                                                                     <p className="mt-1 text-sm text-neutral-600">{entry.descricao}</p>
                                                                 )}
@@ -624,6 +725,37 @@ export default function ApontamentoPage() {
                                     </select>
                                     {formErrors.recurso_id && (
                                         <p className="mt-1 text-xs text-danger">{formErrors.recurso_id}</p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label htmlFor="alocacao_id" className="block text-sm font-medium text-neutral-700">
+                                        Projeto <span className="text-danger">*</span>
+                                    </label>
+                                    <select
+                                        id="alocacao_id"
+                                        name="alocacao_id"
+                                        value={formState.alocacao_id}
+                                        onChange={handleInputChange}
+                                        className={inputClassName(!!formErrors.alocacao_id)}
+                                        disabled={!formState.recurso_id}
+                                    >
+                                        <option value="">
+                                            {formState.recurso_id
+                                                ? "Selecione o projeto"
+                                                : "Selecione um recurso primeiro"}
+                                        </option>
+                                        {alocacoesDoRecursoSelecionado.map((alloc) => {
+                                            const projectName = getProjectTitle(alloc);
+                                            return (
+                                                <option key={alloc.id} value={alloc.id}>
+                                                    {projectName}
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                    {formErrors.alocacao_id && (
+                                        <p className="mt-1 text-xs text-danger">{formErrors.alocacao_id}</p>
                                     )}
                                 </div>
 

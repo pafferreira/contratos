@@ -1419,6 +1419,48 @@ export type Database = {
 
       };
 
+      "C_ORDENS_SERVICO": {
+        Row: {
+          id: string;
+          contrato_fornecedor_id: string | null;
+          numero_os: string;
+          aberta_em: string | null;
+          perfil_solicitado_id: string | null;
+          quantidade_solicitada: number | null;
+          horas_solicitadas: number | null;
+          valor_unitario: number | null;
+          valor_reservado: number | null;
+          valor_consumido: number | null;
+          valor_disponivel: number | null;
+        };
+        Insert: {
+          id?: string;
+          contrato_fornecedor_id?: string | null;
+          numero_os: string;
+          aberta_em?: string | null;
+          perfil_solicitado_id?: string | null;
+          quantidade_solicitada?: number | null;
+          horas_solicitadas?: number | null;
+          valor_unitario?: number | null;
+          valor_reservado?: number | null;
+          valor_consumido?: number | null;
+          valor_disponivel?: number | null;
+        };
+        Update: {
+          id?: string;
+          contrato_fornecedor_id?: string | null;
+          numero_os?: string;
+          aberta_em?: string | null;
+          perfil_solicitado_id?: string | null;
+          quantidade_solicitada?: number | null;
+          horas_solicitadas?: number | null;
+          valor_unitario?: number | null;
+          valor_reservado?: number | null;
+          valor_consumido?: number | null;
+          valor_disponivel?: number | null;
+        };
+      };
+
     };
 
   };

@@ -9,9 +9,10 @@ import { format, parseISO } from "date-fns";
 import clsx from "clsx";
 
 import * as Dialog from "@radix-ui/react-dialog";
+import * as Accordion from "@radix-ui/react-accordion";
 import * as Tooltip from "@radix-ui/react-tooltip";
 
-import { CalendarDays, LayoutGrid, List, Pencil, Plus, RefreshCcw, Trash2, X } from "lucide-react";
+import { CalendarDays, ChevronDown, Pencil, Plus, RefreshCcw, Trash2, X } from "lucide-react";
 
 import { z } from "zod";
 
@@ -21,6 +22,8 @@ import { Button } from "@/components/ui/button";
 
 import { Card } from "@/components/ui/card";
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 import { type Database, type TablesRow } from "@/lib/supabase/types";
@@ -29,9 +32,15 @@ type SupplierContractRow = TablesRow<Database["public"]["Tables"]["C_CONTRATOS_F
 
 type SupplierRow = TablesRow<Database["public"]["Tables"]["C_FORNECEDORES"]>;
 
+type OSRow = TablesRow<Database["public"]["Tables"]["C_ORDENS_SERVICO"]>;
+
+type ProfileRow = TablesRow<Database["public"]["Tables"]["C_PERFIS_RECURSOS"]>;
+
 type SupplierContractRecord = SupplierContractRow & {
 
   fornecedor?: Pick<SupplierRow, "id" | "nome"> | null;
+  os?: OSRow[];
+  osList?: OSRow[];
 
 };
 
@@ -43,6 +52,17 @@ type SupplierFormState = {
 };
 
 type SupplierFormErrors = Partial<Record<keyof SupplierFormState | "general", string>>;
+
+type OSFormState = {
+  numero_os: string;
+  perfil_solicitado_id: string;
+  quantidade_solicitada: string;
+  horas_solicitadas: string;
+  valor_unitario: string;
+  valor_unitario_display: string;
+};
+
+type OSFormErrors = Partial<Record<keyof OSFormState, string>> & { general?: string };
 
 type ContractFormState = {
 
@@ -82,6 +102,20 @@ const SUPPLIERS_TABLE = (
   process.env.NEXT_PUBLIC_SUPABASE_SUPPLIERS_TABLE ?? "C_FORNECEDORES"
 
 ) as keyof Database["public"]["Tables"];
+
+const SERVICE_ORDERS_TABLE = (
+
+  process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ORDERS_TABLE ?? "C_ORDENS_SERVICO"
+
+) as keyof Database["public"]["Tables"];
+
+const PROFILES_TABLE = (
+
+  process.env.NEXT_PUBLIC_SUPABASE_PROFILES_TABLE ?? "C_PERFIS_RECURSOS"
+
+) as keyof Database["public"]["Tables"];
+
+const OS_PROFILE_DELIMITER = "::profile::";
 
 const STATUS_OPTIONS = [
   { value: "rascunho", label: "Rascunho" },
@@ -128,6 +162,15 @@ const EMPTY_SUPPLIER_FORM_STATE: SupplierFormState = {
   nome: "",
   documento: "",
   email_contato: ""
+};
+
+const EMPTY_OS_FORM_STATE: OSFormState = {
+  numero_os: "",
+  perfil_solicitado_id: "",
+  quantidade_solicitada: "",
+  horas_solicitadas: "",
+  valor_unitario: "",
+  valor_unitario_display: ""
 };
 
 const ContractFormSchema = z
@@ -224,6 +267,32 @@ const SupplierFormSchema = z.object({
     .transform((value = "") => value)
 });
 
+const OSFormSchema = z.object({
+  numero_os: z.string().trim().min(1, "Informe o número da OS"),
+  perfil_solicitado_id: z.string().trim().min(1, "Selecione o perfil solicitado"),
+  quantidade_solicitada: z
+    .string()
+    .trim()
+    .min(1, "Informe a quantidade")
+    .transform((value) => Number(value.replace(",", ".")))
+    .refine((value) => !Number.isNaN(value), "Quantidade inválida")
+    .refine((value) => value > 0, "A quantidade deve ser maior que zero"),
+  horas_solicitadas: z
+    .string()
+    .trim()
+    .min(1, "Informe as horas")
+    .transform((value) => Number(value.replace(",", ".")))
+    .refine((value) => !Number.isNaN(value), "Horas inválidas")
+    .refine((value) => value >= 0, "As horas não podem ser negativas"),
+  valor_unitario: z
+    .string()
+    .trim()
+    .min(1, "Informe o valor hora")
+    .transform((value) => Number(value.replace(",", ".")))
+    .refine((value) => !Number.isNaN(value), "Valor inválido")
+    .refine((value) => value > 0, "O valor deve ser maior que zero")
+});
+
 function formatCurrency(value?: number | null) {
 
   if (typeof value !== "number") {
@@ -296,6 +365,36 @@ function normalizeCurrencyInput(value: string) {
 
 }
 
+function calculateOsTotal(quantity?: number | null, hours?: number | null, rate?: number | null) {
+  const safeQuantity = typeof quantity === "number" ? quantity : 0;
+  const safeHours = typeof hours === "number" ? hours : 0;
+  const safeRate = typeof rate === "number" ? rate : 0;
+  return safeQuantity * safeHours * safeRate;
+}
+
+function getOsTotalValue(os: Partial<OSRow>) {
+  if (typeof os.valor_reservado === "number") {
+    return os.valor_reservado;
+  }
+  return calculateOsTotal(os.quantidade_solicitada, os.horas_solicitadas, os.valor_unitario);
+}
+
+function calculateOsFormTotal(state: OSFormState) {
+  const quantity = Number(state.quantidade_solicitada.replace(",", ".")) || 0;
+  const hours = Number(state.horas_solicitadas.replace(",", ".")) || 0;
+  const rate = Number(state.valor_unitario.replace(",", ".")) || 0;
+  return calculateOsTotal(quantity, hours, rate);
+}
+
+function composeOsNumber(baseNumber: string, profileId: string) {
+  return `${baseNumber}${OS_PROFILE_DELIMITER}${profileId}`;
+}
+
+function extractBaseOsNumber(numeroOs?: string | null) {
+  if (!numeroOs) return "";
+  return numeroOs.split(OS_PROFILE_DELIMITER)[0] ?? numeroOs;
+}
+
 export default function ContratosFornecedorPage() {
 
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -303,6 +402,7 @@ export default function ContratosFornecedorPage() {
   const [contracts, setContracts] = useState<SupplierContractRecord[]>([]);
 
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
+  const [profiles, setProfiles] = useState<ProfileRow[]>([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -330,12 +430,24 @@ export default function ContratosFornecedorPage() {
 
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  const [osDialogOpen, setOsDialogOpen] = useState(false);
+  const [osDialogMode, setOsDialogMode] = useState<"create" | "edit">("create");
+  const [osFormState, setOsFormState] = useState<OSFormState>({ ...EMPTY_OS_FORM_STATE });
+  const [osFormErrors, setOsFormErrors] = useState<OSFormErrors>({});
+  const [osSubmitting, setOsSubmitting] = useState(false);
+  const [activeOsId, setActiveOsId] = useState<string | null>(null);
+  const [activeContractForOs, setActiveContractForOs] = useState<SupplierContractRecord | null>(null);
+  const [pendingOs, setPendingOs] = useState<OSRow | null>(null);
+  const [deletingOsId, setDeletingOsId] = useState<string | null>(null);
+  const [confirmDeleteOsId, setConfirmDeleteOsId] = useState<string | null>(null);
+  const [osActionError, setOsActionError] = useState<string | null>(null);
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [activeTab, setActiveTab] = useState<"contracts" | "suppliers">("contracts");
   const [supplierSearchTerm, setSupplierSearchTerm] = useState("");
   const [suppliersLoading, setSuppliersLoading] = useState(true);
   const [suppliersRefreshing, setSuppliersRefreshing] = useState(false);
+  const [profilesLoading, setProfilesLoading] = useState(true);
   const [supplierFormOpen, setSupplierFormOpen] = useState(false);
   const [supplierFormMode, setSupplierFormMode] = useState<"create" | "edit">("create");
   const [supplierFormState, setSupplierFormState] = useState<SupplierFormState>({
@@ -365,6 +477,24 @@ export default function ContratosFornecedorPage() {
     return map;
 
   }, [suppliers]);
+
+  const profilesMap = useMemo(() => {
+
+    const map = new Map<string, ProfileRow>();
+
+    profiles.forEach((profile) => {
+
+      if (profile.id) {
+
+        map.set(profile.id, profile);
+
+      }
+
+    });
+
+    return map;
+
+  }, [profiles]);
 
   const loadSuppliers = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -396,6 +526,35 @@ export default function ContratosFornecedorPage() {
     [supabase]
   );
 
+  const loadProfiles = useCallback(
+    async (_options?: { silent?: boolean }) => {
+      if (!supabase) {
+        setError("Supabase não configurado.");
+        setProfiles([]);
+        setProfilesLoading(false);
+        return [];
+      }
+
+      setProfilesLoading(true);
+      const { data, error: fetchError } = await supabase
+        .from(PROFILES_TABLE)
+        .select("id, nome, valor_hora")
+        .order("nome", { ascending: true });
+
+      if (fetchError) {
+        setError("Erro ao carregar perfis.");
+        setProfilesLoading(false);
+        return [];
+      }
+
+      const rows = (data || []) as ProfileRow[];
+      setProfiles(rows);
+      setProfilesLoading(false);
+      return rows;
+    },
+    [supabase]
+  );
+
   const loadContracts = useCallback(
 
     async (options?: { silent?: boolean }) => {
@@ -418,7 +577,7 @@ export default function ContratosFornecedorPage() {
 
         .from(CONTRACTS_TABLE)
 
-        .select("*, fornecedor:C_FORNECEDORES(id, nome)")
+        .select("*, fornecedor:C_FORNECEDORES(id, nome), os:C_ORDENS_SERVICO(*)")
 
         .order("data_inicio", { ascending: false });
 
@@ -436,7 +595,12 @@ export default function ContratosFornecedorPage() {
 
       }
 
-      setContracts((data || []) as SupplierContractRecord[]);
+      const mappedContracts = (data || []).map((contract) => ({
+        ...contract,
+        osList: (contract as SupplierContractRecord)?.os ?? []
+      })) as SupplierContractRecord[];
+
+      setContracts(mappedContracts);
 
       setLoading(false);
 
@@ -454,7 +618,9 @@ export default function ContratosFornecedorPage() {
 
     void loadContracts();
 
-  }, [loadContracts, loadSuppliers]);
+    void loadProfiles();
+
+  }, [loadContracts, loadSuppliers, loadProfiles]);
 
   const filteredContracts = useMemo(() => {
 
@@ -492,7 +658,11 @@ export default function ContratosFornecedorPage() {
 
     setRefreshing(true);
 
-    await Promise.all([loadSuppliers({ silent: true }), loadContracts({ silent: true })]);
+    await Promise.all([
+      loadSuppliers({ silent: true }),
+      loadContracts({ silent: true }),
+      loadProfiles({ silent: true })
+    ]);
 
     setRefreshing(false);
 
@@ -700,6 +870,194 @@ export default function ContratosFornecedorPage() {
 
   };
 
+  const resetOsForm = useCallback(() => {
+    setOsFormState({ ...EMPTY_OS_FORM_STATE });
+    setOsFormErrors({});
+    setOsSubmitting(false);
+    setActiveOsId(null);
+    setPendingOs(null);
+    setActiveContractForOs(null);
+    setOsActionError(null);
+  }, []);
+
+  const handleOsDialogChange = (open: boolean) => {
+    if (!open) {
+      setOsDialogOpen(false);
+      resetOsForm();
+    } else {
+      setOsDialogOpen(true);
+    }
+  };
+
+  const openCreateOs = (contract: SupplierContractRecord) => {
+    setActiveContractForOs(contract);
+    setOsDialogMode("create");
+    setOsFormErrors({});
+    setOsDialogOpen(true);
+    setActiveOsId(null);
+    setPendingOs(null);
+    setOsFormState({ ...EMPTY_OS_FORM_STATE });
+  };
+
+  const openEditOs = (contract: SupplierContractRecord, os: OSRow) => {
+    setActiveContractForOs(contract);
+    setOsDialogMode("edit");
+    setOsFormErrors({});
+    setOsDialogOpen(true);
+    setActiveOsId(os.id ?? null);
+    setPendingOs(os);
+    setOsFormState({
+      numero_os: extractBaseOsNumber(os.numero_os ?? ""),
+      perfil_solicitado_id: os.perfil_solicitado_id ?? "",
+      quantidade_solicitada: os.quantidade_solicitada?.toString() ?? "",
+      horas_solicitadas: os.horas_solicitadas?.toString() ?? "",
+      valor_unitario: os.valor_unitario?.toString() ?? "",
+      valor_unitario_display: formatCurrencyDisplayFromNumber(os.valor_unitario)
+    });
+  };
+
+  const handleOsInputChange = (
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = event.target;
+    if (name === "perfil_solicitado_id") {
+      const profile = profilesMap.get(value);
+      setOsFormState((prev) => ({
+        ...prev,
+        perfil_solicitado_id: value,
+        valor_unitario: profile ? profile.valor_hora.toString() : prev.valor_unitario,
+        valor_unitario_display: profile
+          ? formatCurrencyDisplayFromNumber(profile.valor_hora)
+          : prev.valor_unitario_display
+      }));
+      return;
+    }
+
+    if (name === "valor_unitario") {
+      const { raw, display } = normalizeCurrencyInput(value);
+      setOsFormState((prev) => ({
+        ...prev,
+        valor_unitario: raw,
+        valor_unitario_display: display
+      }));
+      return;
+    }
+
+    setOsFormState((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleOsSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setOsFormErrors({});
+    setOsActionError(null);
+
+    const normalizedRate =
+      osFormState.valor_unitario_display && osFormState.valor_unitario_display.trim()
+        ? normalizeCurrencyInput(osFormState.valor_unitario_display).raw
+        : osFormState.valor_unitario;
+    const formToValidate = { ...osFormState, valor_unitario: normalizedRate ?? "" };
+
+    if (!supabase) {
+      setOsFormErrors({
+        general: "Supabase não configurado. Verifique as variáveis de ambiente."
+      });
+      return;
+    }
+
+    if (!activeContractForOs?.id) {
+      setOsFormErrors({
+        general: "Selecione um contrato para vincular a OS."
+      });
+      return;
+    }
+
+    const parsed = OSFormSchema.safeParse(formToValidate);
+
+    if (!parsed.success) {
+      const fieldErrors = parsed.error.flatten().fieldErrors;
+      const formattedErrors: OSFormErrors = {};
+      (Object.keys(fieldErrors) as (keyof typeof fieldErrors)[]).forEach((key) => {
+        const [message] = fieldErrors[key] ?? [];
+        if (message) {
+          formattedErrors[key as keyof OSFormState] = message;
+        }
+      });
+      setOsFormErrors(formattedErrors);
+      return;
+    }
+
+    const totalValue = calculateOsTotal(
+      parsed.data.quantidade_solicitada,
+      parsed.data.horas_solicitadas,
+      parsed.data.valor_unitario
+    );
+    const consumedValue = pendingOs?.valor_consumido ?? 0;
+    const numeroOsStored = composeOsNumber(parsed.data.numero_os, parsed.data.perfil_solicitado_id);
+    const payload = {
+      contrato_fornecedor_id: activeContractForOs.id,
+      numero_os: numeroOsStored,
+      perfil_solicitado_id: parsed.data.perfil_solicitado_id,
+      quantidade_solicitada: parsed.data.quantidade_solicitada,
+      horas_solicitadas: parsed.data.horas_solicitadas,
+      valor_unitario: parsed.data.valor_unitario,
+      valor_reservado: totalValue,
+      valor_consumido: consumedValue
+    };
+
+    setOsSubmitting(true);
+
+    const query = supabase.from(SERVICE_ORDERS_TABLE);
+    const response =
+      osDialogMode === "edit" && activeOsId
+        ? await query.update(payload).eq("id", activeOsId)
+        : await query.insert(payload);
+
+    setOsSubmitting(false);
+
+    if (response.error) {
+      setOsFormErrors({
+        general: response.error.message ?? "Erro ao salvar a ordem de serviço."
+      });
+      return;
+    }
+
+    setOsDialogOpen(false);
+    resetOsForm();
+    await loadContracts({ silent: true });
+  };
+
+  const openDeleteOsDialog = (contract: SupplierContractRecord, os: OSRow) => {
+    setActiveContractForOs(contract);
+    setPendingOs(os);
+    setConfirmDeleteOsId(os.id ?? null);
+    setOsActionError(null);
+  };
+
+  const handleDeleteOs = async () => {
+    if (!confirmDeleteOsId) return;
+    if (!supabase) {
+      setOsActionError("Supabase não configurado. Verifique as variáveis de ambiente.");
+      return;
+    }
+
+    setDeletingOsId(confirmDeleteOsId);
+    const { error: deleteErr } = await supabase
+      .from(SERVICE_ORDERS_TABLE)
+      .delete()
+      .eq("id", confirmDeleteOsId);
+    setDeletingOsId(null);
+
+    if (deleteErr) {
+      setOsActionError(deleteErr.message ?? "Erro ao excluir a ordem de serviço.");
+      return;
+    }
+
+    setConfirmDeleteOsId(null);
+    setPendingOs(null);
+    setActiveContractForOs(null);
+    await loadContracts({ silent: true });
+  };
+
   const resetSupplierForm = useCallback(() => {
     setSupplierFormState({ ...EMPTY_SUPPLIER_FORM_STATE });
     setSupplierFormErrors({});
@@ -868,6 +1226,17 @@ export default function ContratosFornecedorPage() {
   const submitDisabled = submitting || (supplierSelectDisabled && isCreateMode);
   const supplierModeIsCreate = supplierFormMode === "create";
   const supabaseUnavailable = supabase === null;
+  const selectedProfile = useMemo(
+    () =>
+      osFormState.perfil_solicitado_id
+        ? profilesMap.get(osFormState.perfil_solicitado_id) ?? null
+        : null,
+    [osFormState.perfil_solicitado_id, profilesMap]
+  );
+  const osTotalPreview = useMemo(() => calculateOsFormTotal(osFormState), [osFormState]);
+  const disableOsProfileSelect = profilesLoading || profiles.length === 0;
+  const osSubmitDisabled =
+    osSubmitting || disableOsProfileSelect || !activeContractForOs || supabaseUnavailable;
 
   const renderContractsSection = () => {
     if (loading) {
@@ -888,260 +1257,28 @@ export default function ContratosFornecedorPage() {
       );
     }
 
-    if (viewMode === "cards") {
-      return (
-        <div className="grid gap-4 xl:grid-cols-2">
-          {filteredContracts.map((contract) => (
-            <Card key={contract.id} className="space-y-4">
-
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-
-                <div>
-
-                  <p className="text-xs uppercase tracking-wide text-neutral-400">
-
-                    Contrato
-
-                  </p>
-
-                  <div className="flex items-center gap-2">
-
-                    <h2 className="text-xl font-semibold text-neutral-900">
-
-                      {contract.numero_contrato}
-
-                    </h2>
-
-                    <span
-
-                      className={clsx(
-
-                        "rounded-full px-2 py-0.5 text-xs font-medium",
-
-                        statusStyles[contract.status ?? "rascunho"] ?? "bg-neutral-100 text-neutral-600"
-
-                      )}
-
-                    >
-
-                      {STATUS_OPTIONS.find((option) => option.value === contract.status)?.label ??
-
-                        "Sem status"}
-
-                    </span>
-
-                  </div>
-
-                  <p className="text-sm text-neutral-600">
-
-                    {contract.fornecedor?.nome ?? "Fornecedor não informado"}
-
-                  </p>
-
-                </div>
-
-                <Tooltip.Provider delayDuration={150}>
-
-                  <div className="flex items-center gap-2">
-
-                    <Tooltip.Root>
-
-                      <Tooltip.Trigger asChild>
-
-                        <Button
-
-                          variant="secondary"
-
-                          size="sm"
-
-                          onClick={() => openEditForm(contract)}
-
-                        >
-
-                          <Pencil className="mr-2 size-4" />
-
-                          Editar
-
-                        </Button>
-
-                      </Tooltip.Trigger>
-
-                      <Tooltip.Portal>
-
-                        <Tooltip.Content
-
-                          side="top"
-
-                          sideOffset={6}
-
-                        className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-
-                        >
-
-                          Editar contrato
-
-                          <Tooltip.Arrow className="fill-white" />
-
-                        </Tooltip.Content>
-
-                      </Tooltip.Portal>
-
-                    </Tooltip.Root>
-
-                    <Tooltip.Root>
-
-                      <Tooltip.Trigger asChild>
-
-                        <Button
-
-                          variant="ghost"
-
-                          size="icon"
-
-                          onClick={() => {
-
-                            setPendingContract(contract);
-
-                            setDeleteOpen(true);
-
-                            setDeleteError(null);
-
-                          }}
-
-                          aria-label="Excluir contrato"
-
-                        >
-
-                          <Trash2 className="size-4" />
-
-                        </Button>
-
-                      </Tooltip.Trigger>
-
-                      <Tooltip.Portal>
-
-                        <Tooltip.Content
-
-                          side="top"
-
-                          sideOffset={6}
-
-                        className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-
-                        >
-
-                          Excluir contrato
-
-                          <Tooltip.Arrow className="fill-white" />
-
-                        </Tooltip.Content>
-
-                      </Tooltip.Portal>
-
-                    </Tooltip.Root>
-
-                  </div>
-
-                </Tooltip.Provider>
-
-              </div>
-
-              <div className="grid gap-3 text-sm text-neutral-600 md:grid-cols-2">
-
-                <div>
-
-                  <p className="text-neutral-500">Valor total</p>
-
-                  <p className="font-medium text-neutral-900">
-
-                    {formatCurrency(contract.valor_total)}
-
-                  </p>
-
-                </div>
-
-                <div>
-
-                  <p className="text-neutral-500">Valor comprometido</p>
-
-                  <p className="font-medium text-neutral-900">
-
-                    {formatCurrency(contract.valor_comprometido)}
-
-                  </p>
-
-                </div>
-
-                <div>
-
-                  <p className="text-neutral-500">Saldo disponível</p>
-
-                  <p className="font-medium text-success">
-
-                    {formatCurrency(contract.valor_disponivel)}
-
-                  </p>
-
-                </div>
-
-                <div className="text-neutral-700">
-                  <div className="flex items-center gap-2">
-                    <CalendarDays className="size-4 text-neutral-400" />
-                    <span className="text-neutral-500">Vigência</span>
-                  </div>
-                  <p className="mt-1 font-medium text-neutral-900">
-                    {formatDateRange(contract.data_inicio, contract.data_fim)}
-                  </p>
-                </div>
-
-              </div>
-
-            </Card>
-
-          ))}
-
-        </div>
-      );
-    }
-
     return (
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-neutral-200 text-sm">
-            <thead className="bg-neutral-50 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
-              <tr>
-                <th className="px-4 py-3">Contrato</th>
-                <th className="px-4 py-3">Valores</th>
-                <th className="px-4 py-3">Vigência</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100 text-neutral-700">
-              {filteredContracts.map((contract) => {
-                const statusLabel =
-                  STATUS_OPTIONS.find((option) => option.value === contract.status)?.label ??
-                  "Sem status";
-                return (
-                  <tr key={`${contract.id}-list`}>
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-neutral-900">{contract.numero_contrato}</p>
-                      <p className="text-xs text-neutral-500">
-                        {contract.fornecedor?.nome ?? "Fornecedor não informado"}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-neutral-900">
-                        {formatCurrency(contract.valor_total)}
-                      </p>
-                      <p className="text-xs text-neutral-500">
-                        Comprometido: {formatCurrency(contract.valor_comprometido)}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      {formatDateRange(contract.data_inicio, contract.data_fim)}
-                    </td>
-                    <td className="px-4 py-3">
+      <Accordion.Root type="single" collapsible className="space-y-3">
+        {filteredContracts.map((contract) => {
+          const statusLabel =
+            STATUS_OPTIONS.find((option) => option.value === contract.status)?.label ??
+            "Sem status";
+          const osList = contract.osList ?? [];
+          const osTotalValue = osList.reduce((sum, os) => sum + getOsTotalValue(os), 0);
+
+          return (
+            <Accordion.Item
+              key={contract.id ?? contract.numero_contrato}
+              value={contract.id ?? contract.numero_contrato}
+              className="overflow-hidden rounded-xl border border-neutral-100 bg-white shadow-sm"
+            >
+              <Accordion.Header>
+                <Accordion.Trigger className="group flex w-full items-start justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-neutral-50 data-[state=open]:border-b data-[state=open]:border-neutral-100">
+                  <div className="flex flex-1 flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-lg font-semibold text-neutral-900">
+                        {contract.numero_contrato}
+                      </h2>
                       <span
                         className={clsx(
                           "rounded-full px-2 py-0.5 text-xs font-medium",
@@ -1151,70 +1288,180 @@ export default function ContratosFornecedorPage() {
                       >
                         {statusLabel}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Tooltip.Provider delayDuration={150}>
-                        <div className="flex items-center justify-end gap-2">
-                          <Tooltip.Root>
-                            <Tooltip.Trigger asChild>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => openEditForm(contract)}
-                                type="button"
-                              >
-                                <Pencil className="mr-2 size-4" />
-                                Editar
-                              </Button>
-                            </Tooltip.Trigger>
-                            <Tooltip.Portal>
-                              <Tooltip.Content
-                                side="top"
-                                sideOffset={6}
-                                className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-                              >
-                                Editar contrato
-                                <Tooltip.Arrow className="fill-white" />
-                              </Tooltip.Content>
-                            </Tooltip.Portal>
-                          </Tooltip.Root>
-                          <Tooltip.Root>
-                            <Tooltip.Trigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                type="button"
-                                onClick={() => {
-                                  setPendingContract(contract);
-                                  setDeleteOpen(true);
-                                  setDeleteError(null);
-                                }}
-                                aria-label="Excluir contrato"
-                              >
-                                <Trash2 className="size-4" />
-                              </Button>
-                            </Tooltip.Trigger>
-                            <Tooltip.Portal>
-                              <Tooltip.Content
-                                side="top"
-                                sideOffset={6}
-                                className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-                              >
-                                Excluir contrato
-                                <Tooltip.Arrow className="fill-white" />
-                              </Tooltip.Content>
-                            </Tooltip.Portal>
-                          </Tooltip.Root>
+                    </div>
+                    <p className="text-sm text-neutral-600">
+                      {contract.fornecedor?.nome ?? "Fornecedor não informado"}
+                    </p>
+                    <div className="grid gap-3 text-xs text-neutral-700 md:grid-cols-3">
+                      <div>
+                        <p className="text-neutral-500">Valor total</p>
+                        <p className="font-semibold text-neutral-900">
+                          {formatCurrency(contract.valor_total)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-neutral-500">Saldo do contrato</p>
+                        <p className="font-semibold text-neutral-900">
+                          {formatCurrency(contract.valor_disponivel)}
+                        </p>
+                        <p className="text-[11px] text-neutral-500">
+                          Comprometido: {formatCurrency(contract.valor_comprometido)}
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <CalendarDays className="size-4 text-neutral-400" />
+                          <span className="text-neutral-500">Vigência</span>
                         </div>
-                      </Tooltip.Provider>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+                        <p className="font-semibold text-neutral-900">
+                          {formatDateRange(contract.data_inicio, contract.data_fim)}
+                        </p>
+                        <p className="text-[11px] text-neutral-500">
+                          OSs: {osList.length} — Total OS {formatCurrency(osTotalValue)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          openEditForm(contract);
+                        }}
+                      >
+                        <Pencil className="mr-2 size-4" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setPendingContract(contract);
+                          setDeleteOpen(true);
+                          setDeleteError(null);
+                        }}
+                        aria-label="Excluir contrato"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                    <ChevronDown className="size-5 text-neutral-400 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                  </div>
+                </Accordion.Trigger>
+              </Accordion.Header>
+
+              <Accordion.Content className="border-t border-neutral-100 bg-white">
+                <div className="space-y-3 p-4">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-neutral-900">Ordens de Serviço</p>
+                      <p className="text-xs text-neutral-500">
+                        Gerencie OSs vinculadas a este contrato.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      type="button"
+                      disabled={supabaseUnavailable}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        openCreateOs(contract);
+                      }}
+                    >
+                      <Plus className="mr-2 size-4" />
+                      Nova OS
+                    </Button>
+                  </div>
+
+                  {osList.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-500">
+                      Nenhuma OS cadastrada para este contrato.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-neutral-100 text-sm">
+                        <thead className="bg-neutral-50 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                          <tr>
+                            <th className="px-3 py-2">Número</th>
+                            <th className="px-3 py-2">Perfil</th>
+                            <th className="px-3 py-2">Quantidade</th>
+                            <th className="px-3 py-2">Horas</th>
+                            <th className="px-3 py-2">Valor unit.</th>
+                            <th className="px-3 py-2">Total</th>
+                            <th className="px-3 py-2 text-right">Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-100 text-neutral-700">
+                          {osList.map((os) => {
+                            const total = getOsTotalValue(os);
+                            const osDisplayNumber = extractBaseOsNumber(os.numero_os);
+                            const profileName = os.perfil_solicitado_id
+                              ? profilesMap.get(os.perfil_solicitado_id)?.nome
+                              : null;
+                            const unitValue =
+                              typeof os.valor_unitario === "number"
+                                ? formatCurrency(os.valor_unitario)
+                                : "-";
+                            return (
+                              <tr key={os.id}>
+                                <td className="px-3 py-2 font-semibold text-neutral-900">
+                                  {osDisplayNumber}
+                                </td>
+                                <td className="px-3 py-2">{profileName ?? "Perfil não informado"}</td>
+                                <td className="px-3 py-2">{os.quantidade_solicitada ?? "-"}</td>
+                                <td className="px-3 py-2">{os.horas_solicitadas ?? "-"}</td>
+                                <td className="px-3 py-2">{unitValue}</td>
+                                <td className="px-3 py-2 font-semibold text-neutral-900">
+                                  {formatCurrency(total)}
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      type="button"
+                                      onClick={() => openEditOs(contract, os)}
+                                      disabled={supabaseUnavailable}
+                                    >
+                                      <Pencil className="mr-2 size-4" />
+                                      Editar
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      type="button"
+                                      className="text-danger"
+                                      onClick={() => openDeleteOsDialog(contract, os)}
+                                      disabled={supabaseUnavailable}
+                                      aria-label="Excluir OS"
+                                    >
+                                      <Trash2 className="size-4" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </Accordion.Content>
+            </Accordion.Item>
+          );
+        })}
+      </Accordion.Root>
     );
   };
 
@@ -1349,46 +1596,21 @@ export default function ContratosFornecedorPage() {
               onChange={(event) => setSearchTerm(event.target.value)}
             />
           </div>
-          <div className="flex flex-col gap-2 md:w-auto">
-            <span className="text-sm font-medium text-neutral-600">Visualização</span>
-            <div className="flex items-center gap-2">
-              <div className="flex rounded-lg border border-neutral-200 bg-white p-1">
-                <Button
-                  type="button"
-                  size="icon"
-                  variant={viewMode === "cards" ? "primary" : "ghost"}
-                  onClick={() => setViewMode("cards")}
-                  aria-pressed={viewMode === "cards"}
-                >
-                  <LayoutGrid className="size-4" />
-                </Button>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant={viewMode === "list" ? "primary" : "ghost"}
-                  onClick={() => setViewMode("list")}
-                  aria-pressed={viewMode === "list"}
-                >
-                  <List className="size-4" />
-                </Button>
-              </div>
-              <div className="flex flex-col gap-2 md:flex-row">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  type="button"
-                >
-                  <RefreshCcw className={clsx("mr-2 size-4", refreshing && "animate-spin")} />
-                  Atualizar
-                </Button>
-                <Button onClick={openCreateForm} disabled={supabaseUnavailable}>
-                  <Plus className="mr-2 size-4" />
-                  Novo contrato
-                </Button>
-              </div>
-            </div>
+          <div className="flex flex-col gap-2 md:w-auto md:flex-row">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              type="button"
+            >
+              <RefreshCcw className={clsx("mr-2 size-4", refreshing && "animate-spin")} />
+              {refreshing ? "Atualizando..." : "Atualizar dados"}
+            </Button>
+            <Button onClick={openCreateForm} disabled={supabaseUnavailable}>
+              <Plus className="mr-2 size-4" />
+              Novo contrato
+            </Button>
           </div>
         </div>
       );
@@ -1439,26 +1661,22 @@ export default function ContratosFornecedorPage() {
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant={activeTab === "contracts" ? "secondary" : "ghost"}
-          onClick={() => setActiveTab("contracts")}
-        >
-          Contratos
-        </Button>
-        <Button
-          type="button"
-          variant={activeTab === "suppliers" ? "secondary" : "ghost"}
-          onClick={() => setActiveTab("suppliers")}
-        >
-          Fornecedores
-        </Button>
-      </div>
+      <Tabs defaultValue="contracts" value={activeTab} onValueChange={(value) => setActiveTab(value as "contracts" | "suppliers")}>
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="contracts">Contratos</TabsTrigger>
+          <TabsTrigger value="suppliers">Fornecedores</TabsTrigger>
+        </TabsList>
 
-      {renderToolbar()}
+        <TabsContent value="contracts" className="space-y-6">
+          {renderToolbar()}
+          {renderContractsSection()}
+        </TabsContent>
 
-      {activeTab === "contracts" ? renderContractsSection() : renderSuppliersSection()}
+        <TabsContent value="suppliers" className="space-y-6">
+          {renderToolbar()}
+          {renderSuppliersSection()}
+        </TabsContent>
+      </Tabs>
 
       <Dialog.Root open={formOpen} onOpenChange={handleFormDialogChange}>
         <Dialog.Portal>
@@ -1469,85 +1687,257 @@ export default function ContratosFornecedorPage() {
 
             <div className="mb-4 flex items-center justify-between">
 
-                <div>
+              <div>
 
-                  <Dialog.Title className="text-lg font-semibold text-neutral-900">
+                <Dialog.Title className="text-lg font-semibold text-neutral-900">
 
-                    {isCreateMode ? "Novo contrato de fornecedor" : "Editar contrato de fornecedor"}
+                  {isCreateMode ? "Novo contrato de fornecedor" : "Editar contrato de fornecedor"}
 
-                  </Dialog.Title>
+                </Dialog.Title>
 
-                  <Dialog.Description className="text-sm text-neutral-500">
+                <Dialog.Description className="text-sm text-neutral-500">
 
-                    Preencha os dados e clique em salvar. Pressione ESC ou clique fora para fechar.
+                  Preencha os dados e clique em salvar. Pressione ESC ou clique fora para fechar.
 
-                  </Dialog.Description>
-
-                </div>
-
-                <Dialog.Close asChild>
-
-                  <button
-
-                    className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
-
-                    aria-label="Fechar"
-
-                    type="button"
-
-                    onClick={resetForm}
-
-                  >
-
-                    <X className="size-4" />
-
-                  </button>
-
-                </Dialog.Close>
+                </Dialog.Description>
 
               </div>
 
-              {formErrors.general ? (
+              <Dialog.Close asChild>
 
-                <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
+                <button
 
-                  {formErrors.general}
+                  className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
 
-                </div>
+                  aria-label="Fechar"
 
-              ) : null}
+                  type="button"
 
-              <form className="space-y-4" onSubmit={handleSubmit}>
+                  onClick={resetForm}
 
-                <div>
+                >
 
-                  <label className="text-sm font-medium text-neutral-700">Fornecedor</label>
+                  <X className="size-4" />
 
-                  <select
+                </button>
 
-                    name="fornecedor_id"
+              </Dialog.Close>
 
-                    value={formState.fornecedor_id}
+            </div>
 
-                    onChange={handleInputChange}
+            {formErrors.general ? (
 
-                    className={clsx(inputClassName(Boolean(formErrors.fornecedor_id)), "mt-2 bg-white")}
+              <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
 
-                    disabled={supplierSelectDisabled}
+                {formErrors.general}
 
-                  >
+              </div>
 
-                    <option value="">
+            ) : null}
 
-                      {supplierSelectDisabled ? "Cadastre fornecedores primeiro" : "Selecione o fornecedor"}
+            <form className="space-y-4" onSubmit={handleSubmit}>
+
+              <div>
+
+                <label className="text-sm font-medium text-neutral-700">Fornecedor</label>
+
+                <select
+
+                  name="fornecedor_id"
+
+                  value={formState.fornecedor_id}
+
+                  onChange={handleInputChange}
+
+                  className={clsx(inputClassName(Boolean(formErrors.fornecedor_id)), "mt-2 bg-white")}
+
+                  disabled={supplierSelectDisabled}
+
+                >
+
+                  <option value="">
+
+                    {supplierSelectDisabled ? "Cadastre fornecedores primeiro" : "Selecione o fornecedor"}
+
+                  </option>
+
+                  {suppliers.map((supplier) => (
+
+                    <option key={supplier.id} value={supplier.id}>
+
+                      {supplier.nome}
 
                     </option>
 
-                    {suppliers.map((supplier) => (
+                  ))}
 
-                      <option key={supplier.id} value={supplier.id}>
+                </select>
 
-                        {supplier.nome}
+                {formErrors.fornecedor_id ? (
+
+                  <p className="mt-1 text-xs text-danger">{formErrors.fornecedor_id}</p>
+
+                ) : null}
+
+              </div>
+
+              <div>
+
+                <label className="text-sm font-medium text-neutral-700">Número do contrato</label>
+
+                <input
+
+                  type="text"
+
+                  name="numero_contrato"
+
+                  value={formState.numero_contrato}
+
+                  onChange={handleInputChange}
+
+                  className={clsx(inputClassName(Boolean(formErrors.numero_contrato)), "mt-2")}
+
+                />
+
+                {formErrors.numero_contrato ? (
+
+                  <p className="mt-1 text-xs text-danger">{formErrors.numero_contrato}</p>
+
+                ) : null}
+
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+
+                <div>
+
+                  <label className="text-sm font-medium text-neutral-700">Início da vigência</label>
+
+                  <input
+
+                    type="date"
+
+                    name="data_inicio"
+
+                    value={formState.data_inicio}
+
+                    onChange={handleInputChange}
+
+                    className={clsx(inputClassName(Boolean(formErrors.data_inicio)), "mt-2")}
+
+                  />
+
+                  {formErrors.data_inicio ? (
+
+                    <p className="mt-1 text-xs text-danger">{formErrors.data_inicio}</p>
+
+                  ) : null}
+
+                </div>
+
+                <div>
+
+                  <label className="text-sm font-medium text-neutral-700">Fim da vigência</label>
+
+                  <input
+
+                    type="date"
+
+                    name="data_fim"
+
+                    value={formState.data_fim}
+
+                    onChange={handleInputChange}
+
+                    className={clsx(inputClassName(Boolean(formErrors.data_fim)), "mt-2")}
+
+                  />
+
+                  {formErrors.data_fim ? (
+
+                    <p className="mt-1 text-xs text-danger">{formErrors.data_fim}</p>
+
+                  ) : null}
+
+                </div>
+
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+
+                <div>
+
+                  <label className="text-sm font-medium text-neutral-700">Valor total</label>
+
+                  <input
+
+                    type="text"
+
+                    name="valor_total_display"
+
+                    value={formState.valor_total_display}
+
+                    onChange={(event) => handleCurrencyChange(event, "valor_total")}
+
+                    className={clsx(inputClassName(Boolean(formErrors.valor_total)), "mt-2")}
+
+                  />
+
+                  {formErrors.valor_total ? (
+
+                    <p className="mt-1 text-xs text-danger">{formErrors.valor_total}</p>
+
+                  ) : null}
+
+                </div>
+
+                <div>
+
+                  <label className="text-sm font-medium text-neutral-700">Valor comprometido</label>
+
+                  <input
+
+                    type="text"
+
+                    name="valor_comprometido_display"
+
+                    value={formState.valor_comprometido_display}
+
+                    onChange={(event) => handleCurrencyChange(event, "valor_comprometido")}
+
+                    className={clsx(inputClassName(Boolean(formErrors.valor_comprometido)), "mt-2")}
+
+                  />
+
+                  {formErrors.valor_comprometido ? (
+
+                    <p className="mt-1 text-xs text-danger">{formErrors.valor_comprometido}</p>
+
+                  ) : null}
+
+                </div>
+
+                <div>
+
+                  <label className="text-sm font-medium text-neutral-700">Status</label>
+
+                  <select
+
+                    name="status"
+
+                    value={formState.status}
+
+                    onChange={handleInputChange}
+
+                    className={clsx(inputClassName(Boolean(formErrors.status)), "mt-2 bg-white")}
+
+                  >
+
+                    {STATUS_OPTIONS.map((option) => (
+
+                      <option key={option.value} value={option.value}>
+
+                        {option.label}
 
                       </option>
 
@@ -1555,213 +1945,214 @@ export default function ContratosFornecedorPage() {
 
                   </select>
 
-                  {formErrors.fornecedor_id ? (
+                  {formErrors.status ? (
 
-                    <p className="mt-1 text-xs text-danger">{formErrors.fornecedor_id}</p>
-
-                  ) : null}
-
-                </div>
-
-                <div>
-
-                  <label className="text-sm font-medium text-neutral-700">Número do contrato</label>
-
-                  <input
-
-                    type="text"
-
-                    name="numero_contrato"
-
-                    value={formState.numero_contrato}
-
-                    onChange={handleInputChange}
-
-                    className={clsx(inputClassName(Boolean(formErrors.numero_contrato)), "mt-2")}
-
-                  />
-
-                  {formErrors.numero_contrato ? (
-
-                    <p className="mt-1 text-xs text-danger">{formErrors.numero_contrato}</p>
+                    <p className="mt-1 text-xs text-danger">{formErrors.status}</p>
 
                   ) : null}
 
                 </div>
+              </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
+              <div className="flex items-center justify-end gap-3 pt-2">
 
-                  <div>
+                <Dialog.Close asChild>
 
-                    <label className="text-sm font-medium text-neutral-700">Início da vigência</label>
+                  <Button type="button" variant="outline" onClick={resetForm}>
 
-                    <input
-
-                      type="date"
-
-                      name="data_inicio"
-
-                      value={formState.data_inicio}
-
-                      onChange={handleInputChange}
-
-                      className={clsx(inputClassName(Boolean(formErrors.data_inicio)), "mt-2")}
-
-                    />
-
-                    {formErrors.data_inicio ? (
-
-                      <p className="mt-1 text-xs text-danger">{formErrors.data_inicio}</p>
-
-                    ) : null}
-
-                  </div>
-
-                  <div>
-
-                    <label className="text-sm font-medium text-neutral-700">Fim da vigência</label>
-
-                    <input
-
-                      type="date"
-
-                      name="data_fim"
-
-                      value={formState.data_fim}
-
-                      onChange={handleInputChange}
-
-                      className={clsx(inputClassName(Boolean(formErrors.data_fim)), "mt-2")}
-
-                    />
-
-                    {formErrors.data_fim ? (
-
-                      <p className="mt-1 text-xs text-danger">{formErrors.data_fim}</p>
-
-                    ) : null}
-
-                  </div>
-
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-3">
-
-                  <div>
-
-                    <label className="text-sm font-medium text-neutral-700">Valor total</label>
-
-                    <input
-
-                      type="text"
-
-                      name="valor_total_display"
-
-                      value={formState.valor_total_display}
-
-                      onChange={(event) => handleCurrencyChange(event, "valor_total")}
-
-                      className={clsx(inputClassName(Boolean(formErrors.valor_total)), "mt-2")}
-
-                    />
-
-                    {formErrors.valor_total ? (
-
-                      <p className="mt-1 text-xs text-danger">{formErrors.valor_total}</p>
-
-                    ) : null}
-
-                  </div>
-
-                  <div>
-
-                    <label className="text-sm font-medium text-neutral-700">Valor comprometido</label>
-
-                    <input
-
-                      type="text"
-
-                      name="valor_comprometido_display"
-
-                      value={formState.valor_comprometido_display}
-
-                      onChange={(event) => handleCurrencyChange(event, "valor_comprometido")}
-
-                      className={clsx(inputClassName(Boolean(formErrors.valor_comprometido)), "mt-2")}
-
-                    />
-
-                    {formErrors.valor_comprometido ? (
-
-                      <p className="mt-1 text-xs text-danger">{formErrors.valor_comprometido}</p>
-
-                    ) : null}
-
-                  </div>
-
-                  <div>
-
-                    <label className="text-sm font-medium text-neutral-700">Status</label>
-
-                    <select
-
-                      name="status"
-
-                      value={formState.status}
-
-                      onChange={handleInputChange}
-
-                      className={clsx(inputClassName(Boolean(formErrors.status)), "mt-2 bg-white")}
-
-                    >
-
-                      {STATUS_OPTIONS.map((option) => (
-
-                        <option key={option.value} value={option.value}>
-
-                          {option.label}
-
-                        </option>
-
-                      ))}
-
-                    </select>
-
-                    {formErrors.status ? (
-
-                      <p className="mt-1 text-xs text-danger">{formErrors.status}</p>
-
-                    ) : null}
-
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-2">
-
-                  <Dialog.Close asChild>
-
-                    <Button type="button" variant="outline" onClick={resetForm}>
-
-                      Cancelar
-
-                    </Button>
-
-                  </Dialog.Close>
-
-                  <Button type="submit" disabled={submitDisabled}>
-
-                    {submitting ? "Salvando..." : isCreateMode ? "Criar contrato" : "Atualizar contrato"}
+                    Cancelar
 
                   </Button>
 
-                </div>
+                </Dialog.Close>
 
-              </form>
+                <Button type="submit" disabled={submitDisabled}>
+
+                  {submitting ? "Salvando..." : isCreateMode ? "Criar contrato" : "Atualizar contrato"}
+
+                </Button>
+
+              </div>
+
+            </form>
 
           </Dialog.Content>
 
         </Dialog.Portal>
 
+      </Dialog.Root>
+
+      <Dialog.Root open={osDialogOpen} onOpenChange={handleOsDialogChange}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl focus:outline-none">
+            <div className="mb-4 flex items-start justify-between">
+              <div>
+                <Dialog.Title className="text-lg font-semibold text-neutral-900">
+                  {osDialogMode === "create" ? "Nova ordem de serviço" : "Editar ordem de serviço"}
+                </Dialog.Title>
+                <Dialog.Description className="text-sm text-neutral-500">
+                  {activeContractForOs
+                    ? `Contrato ${activeContractForOs.numero_contrato} · ${activeContractForOs.fornecedor?.nome ?? "Fornecedor"}`
+                    : "Selecione um contrato para vincular a OS."}
+                </Dialog.Description>
+              </div>
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
+                  aria-label="Fechar modal de OS"
+                  onClick={resetOsForm}
+                >
+                  <X className="size-4" />
+                </button>
+              </Dialog.Close>
+            </div>
+
+            {osFormErrors.general ? (
+              <div className="mb-4 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+                {osFormErrors.general}
+              </div>
+            ) : null}
+
+            <form className="space-y-4" onSubmit={handleOsSubmit}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="text-sm font-medium text-neutral-700" htmlFor="numero_os">
+                    Número da OS
+                  </label>
+                  <input
+                    id="numero_os"
+                    name="numero_os"
+                    value={osFormState.numero_os}
+                    onChange={handleOsInputChange}
+                    className={clsx(inputClassName(Boolean(osFormErrors.numero_os)), "mt-2")}
+                    placeholder="Ex.: OS-2024-05"
+                  />
+                  {osFormErrors.numero_os ? (
+                    <p className="mt-1 text-xs text-danger">{osFormErrors.numero_os}</p>
+                  ) : null}
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-neutral-700" htmlFor="perfil_solicitado_id">
+                    Perfil solicitado
+                  </label>
+                  <select
+                    id="perfil_solicitado_id"
+                    name="perfil_solicitado_id"
+                    value={osFormState.perfil_solicitado_id}
+                    onChange={handleOsInputChange}
+                    className={clsx(
+                      inputClassName(Boolean(osFormErrors.perfil_solicitado_id)),
+                      "mt-2 bg-white"
+                    )}
+                    disabled={disableOsProfileSelect}
+                  >
+                    <option value="">
+                      {disableOsProfileSelect
+                        ? "Cadastre perfis de recurso primeiro"
+                        : "Selecione o perfil"}
+                    </option>
+                    {profiles.map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.nome}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedProfile ? (
+                    <p className="mt-1 text-xs text-neutral-500">
+                      Valor hora: {formatCurrency(selectedProfile.valor_hora)}
+                    </p>
+                  ) : null}
+                  {osFormErrors.perfil_solicitado_id ? (
+                    <p className="mt-1 text-xs text-danger">{osFormErrors.perfil_solicitado_id}</p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <label className="text-sm font-medium text-neutral-700" htmlFor="quantidade_solicitada">
+                    Quantidade
+                  </label>
+                  <input
+                    id="quantidade_solicitada"
+                    name="quantidade_solicitada"
+                    type="number"
+                    step="any"
+                    value={osFormState.quantidade_solicitada}
+                    onChange={handleOsInputChange}
+                    className={clsx(inputClassName(Boolean(osFormErrors.quantidade_solicitada)), "mt-2")}
+                  />
+                  {osFormErrors.quantidade_solicitada ? (
+                    <p className="mt-1 text-xs text-danger">{osFormErrors.quantidade_solicitada}</p>
+                  ) : null}
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-neutral-700" htmlFor="horas_solicitadas">
+                    Horas
+                  </label>
+                  <input
+                    id="horas_solicitadas"
+                    name="horas_solicitadas"
+                    type="number"
+                    step="any"
+                    value={osFormState.horas_solicitadas}
+                    onChange={handleOsInputChange}
+                    className={clsx(inputClassName(Boolean(osFormErrors.horas_solicitadas)), "mt-2")}
+                  />
+                  {osFormErrors.horas_solicitadas ? (
+                    <p className="mt-1 text-xs text-danger">{osFormErrors.horas_solicitadas}</p>
+                  ) : null}
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-neutral-700" htmlFor="valor_unitario">
+                    Valor hora
+                  </label>
+                  <input
+                    id="valor_unitario"
+                    name="valor_unitario"
+                    type="text"
+                    inputMode="decimal"
+                    value={osFormState.valor_unitario_display}
+                    onChange={handleOsInputChange}
+                    className={clsx(inputClassName(Boolean(osFormErrors.valor_unitario)), "mt-2")}
+                  />
+                  {osFormErrors.valor_unitario ? (
+                    <p className="mt-1 text-xs text-danger">{osFormErrors.valor_unitario}</p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg bg-neutral-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-neutral-800">Total estimado</p>
+                  <p className="text-xs text-neutral-500">
+                    Quantidade x horas x valor unitário
+                  </p>
+                </div>
+                <p className="text-lg font-semibold text-neutral-900">
+                  {formatCurrency(osTotalPreview)}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <Dialog.Close asChild>
+                  <Button type="button" variant="outline" onClick={resetOsForm}>
+                    Cancelar
+                  </Button>
+                </Dialog.Close>
+                <Button type="submit" disabled={osSubmitDisabled}>
+                  {osSubmitting
+                    ? "Salvando..."
+                    : osDialogMode === "create"
+                      ? "Criar OS"
+                      : "Atualizar OS"}
+                </Button>
+              </div>
+            </form>
+          </Dialog.Content>
+        </Dialog.Portal>
       </Dialog.Root>
 
       <Dialog.Root open={supplierFormOpen} onOpenChange={handleSupplierFormDialogChange}>
@@ -1917,44 +2308,105 @@ export default function ContratosFornecedorPage() {
         </Dialog.Portal>
       </Dialog.Root>
 
+      <Dialog.Root
+        open={Boolean(confirmDeleteOsId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmDeleteOsId(null);
+            setPendingOs(null);
+            setOsActionError(null);
+          }
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl focus:outline-none">
+            <Dialog.Title className="text-lg font-semibold text-neutral-900">
+              Excluir ordem de serviço
+            </Dialog.Title>
+            <Dialog.Description className="mt-2 text-sm text-neutral-600">
+              Confirma a exclusão da OS{" "}
+              <span className="font-semibold text-neutral-900">
+                {extractBaseOsNumber(pendingOs?.numero_os)}
+              </span>{" "}
+              vinculada ao contrato{" "}
+              <span className="font-semibold text-neutral-900">
+                {activeContractForOs?.numero_contrato}
+              </span>
+              ? Essa ação não pode ser desfeita.
+            </Dialog.Description>
+
+            {osActionError ? (
+              <div className="mt-4 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+                {osActionError}
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <Dialog.Close asChild>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => {
+                    setPendingOs(null);
+                    setConfirmDeleteOsId(null);
+                    setOsActionError(null);
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </Dialog.Close>
+              <Button
+                variant="destructive"
+                type="button"
+                onClick={handleDeleteOs}
+                disabled={!confirmDeleteOsId || deletingOsId === confirmDeleteOsId}
+              >
+                {deletingOsId === confirmDeleteOsId ? "Excluindo..." : "Excluir"}
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
       <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
           <Dialog.Content
             className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl focus:outline-none"
           >
-              <Dialog.Title className="text-lg font-semibold text-neutral-900">
-                Excluir contrato
-              </Dialog.Title>
-              <Dialog.Description className="mt-2 text-sm text-neutral-600">
-                Confirma a exclusão do contrato{" "}
-                <span className="font-semibold text-neutral-800">
-                 {pendingContract?.numero_contrato} 
-                 </span>{" "} ? 
-                <p>Essa ação não pode ser desfeita.</p>
-              </Dialog.Description>
+            <Dialog.Title className="text-lg font-semibold text-neutral-900">
+              Excluir contrato
+            </Dialog.Title>
+            <Dialog.Description className="mt-2 text-sm text-neutral-600">
+              Confirma a exclusão do contrato{" "}
+              <span className="font-semibold text-neutral-800">
+                {pendingContract?.numero_contrato}
+              </span>{" "} ?
+              <p>Essa ação não pode ser desfeita.</p>
+            </Dialog.Description>
 
-              {deleteError ? (
-                <div className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
-                  {deleteError}
-                </div>
-              ) : null}
-
-              <div className="mt-6 flex justify-end gap-3">
-                <Dialog.Close asChild>
-                  <Button variant="outline" type="button" onClick={() => setPendingContract(null)}>
-                    Cancelar
-                  </Button>
-                </Dialog.Close>
-                <Button
-                  variant="destructive"
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={deleteLoading || !pendingContract}
-                >
-                  {deleteLoading ? "Excluindo..." : "Excluir"}
-                </Button>
+            {deleteError ? (
+              <div className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
+                {deleteError}
               </div>
+            ) : null}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <Dialog.Close asChild>
+                <Button variant="outline" type="button" onClick={() => setPendingContract(null)}>
+                  Cancelar
+                </Button>
+              </Dialog.Close>
+              <Button
+                variant="destructive"
+                type="button"
+                onClick={handleDelete}
+                disabled={deleteLoading || !pendingContract}
+              >
+                {deleteLoading ? "Excluindo..." : "Excluir"}
+              </Button>
+            </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
