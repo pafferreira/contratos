@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import * as Accordion from "@radix-ui/react-accordion";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ChevronDown, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import clsx from "clsx";
 
 import { PageHeader } from "@/components/common/page-header";
@@ -354,6 +354,39 @@ export default function ProjetosPage() {
     await loadProjects();
   };
 
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredRsList = useMemo(() => {
+    if (!searchTerm.trim()) return rsList;
+
+    const lowerTerm = searchTerm.toLowerCase();
+
+    return rsList.filter((rs) => {
+      // Busca nos campos da RS
+      const matchRs =
+        rs.codigo_rs?.toLowerCase().includes(lowerTerm) ||
+        rs.titulo?.toLowerCase().includes(lowerTerm) ||
+        rs.status?.toLowerCase().includes(lowerTerm) ||
+        rs.especificacao?.numero_especificacao?.toLowerCase().includes(lowerTerm);
+
+      if (matchRs) return true;
+
+      // Busca nas métricas (recursos)
+      const matchMetrics = rs.metricasList.some((metric) => {
+        const profileMatch = profiles.find(
+          (p) => Number(p.valor_hora) === Number(metric.taxa ?? 0)
+        );
+
+        return (
+          metric.tipo_metrica?.toLowerCase().includes(lowerTerm) ||
+          profileMatch?.nome.toLowerCase().includes(lowerTerm)
+        );
+      });
+
+      return matchMetrics;
+    });
+  }, [rsList, searchTerm, profiles]);
+
   const renderContent = () => {
     if (loading) {
       return (
@@ -363,17 +396,24 @@ export default function ProjetosPage() {
       );
     }
 
-    if (rsList.length === 0) {
+    if (filteredRsList.length === 0) {
       return (
         <Card>
-          <p className="text-sm text-neutral-500">Nenhuma RS encontrada.</p>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <p className="text-sm font-medium text-neutral-900">Nenhum resultado encontrado</p>
+            <p className="text-sm text-neutral-500">
+              {searchTerm
+                ? `Não encontramos projetos correspondentes a "${searchTerm}"`
+                : "Nenhuma RS encontrada."}
+            </p>
+          </div>
         </Card>
       );
     }
 
     return (
       <Accordion.Root type="single" collapsible className="space-y-3">
-        {rsList.map((rs) => {
+        {filteredRsList.map((rs) => {
           const percent = rs.percentual_conclusao ?? 0;
           const metrics = rs.metricasList ?? [];
 
@@ -416,7 +456,7 @@ export default function ProjetosPage() {
                         }}
                       >
                         <Plus className="mr-2 size-4" />
-                        Novo Projeto
+                        Novo Recurso
                       </Button>
                     </div>
                     <ChevronDown className="size-5 text-neutral-400 transition-transform duration-200 group-data-[state=open]:rotate-180" />
@@ -443,7 +483,7 @@ export default function ProjetosPage() {
                       }}
                     >
                       <Plus className="mr-2 size-4" />
-                      Novo Projeto
+                      Novo Recurso
                     </Button>
                   </div>
 
@@ -538,6 +578,18 @@ export default function ProjetosPage() {
         }
       />
 
+      {/* Barra de Busca */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+        <input
+          type="text"
+          placeholder="Buscar por RS, ESP, Título, Perfil ou Status..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full rounded-lg border border-neutral-200 py-2 pl-10 pr-4 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+        />
+      </div>
+
       {error ? (
         <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
           {error}
@@ -553,7 +605,7 @@ export default function ProjetosPage() {
             <div className="mb-4 flex items-start justify-between">
               <div>
                 <Dialog.Title className="text-lg font-semibold text-neutral-900">
-                  {pjDialogMode === "create" ? "Novo Projeto" : "Editar Projeto"}
+                  {pjDialogMode === "create" ? "Novo Recurso" : "Editar Recurso"}
                 </Dialog.Title>
                 <Dialog.Description className="text-sm text-neutral-500">
                   Defina métricas vinculadas à RS selecionada.
@@ -720,8 +772,8 @@ export default function ProjetosPage() {
                   {pjSubmitting
                     ? "Salvando..."
                     : pjDialogMode === "create"
-                      ? "Criar projeto"
-                      : "Atualizar projeto"}
+                      ? "Criar recurso"
+                      : "Atualizar recurso"}
                 </Button>
               </div>
             </form>
@@ -742,10 +794,10 @@ export default function ProjetosPage() {
           <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
           <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl focus:outline-none">
             <Dialog.Title className="text-lg font-semibold text-neutral-900">
-              Excluir projeto
+              Excluir recurso
             </Dialog.Title>
             <Dialog.Description className="mt-2 text-sm text-neutral-600">
-              Confirma a exclusão desta métrica/projeto? Essa ação não pode ser desfeita.
+              Confirma a exclusão desta métrica/recurso? Essa ação não pode ser desfeita.
             </Dialog.Description>
 
             {pjActionError ? (

@@ -14,7 +14,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Monitoramento de Contratos e RS",
   description:
-    "Plataforma da BU para controle de contratos, requisições de serviço e recursos ATE."
+    "Plataforma da BU para controle de contratos, requisições de serviço e recursos ATE.",
+  icons: {
+    icon: "/favicon.ico"
+  }
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

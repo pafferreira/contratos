@@ -31,7 +31,10 @@ import { type Database, type TablesRow } from "@/lib/supabase/types";
 
 type ResourceRow = TablesRow<Database["public"]["Tables"]["C_RECURSOS_FORNECEDOR"]>;
 type SupplierRow = TablesRow<Database["public"]["Tables"]["C_FORNECEDORES"]>;
-type AllocationRow = TablesRow<Database["public"]["Tables"]["C_ALOCACOES_RECURSOS"]>;
+type AllocationRow = TablesRow<Database["public"]["Tables"]["C_ALOCACOES_RECURSOS"]> & {
+    solicitacao?: { titulo: string | null } | null;
+    ordem_servico?: { numero_os: string | null } | null;
+};
 
 type TimeEntry = {
     id: string;
@@ -58,7 +61,8 @@ type ResourceWithEntries = ResourceRow & {
 
 type TimeEntryFormState = {
     recurso_id: string;
-    alocacao_id: string;
+    os_id: string;
+    projeto_id: string;
     data: string;
     hora_inicio: string;
     hora_fim: string;
@@ -71,7 +75,8 @@ type FormErrors = Partial<Record<keyof TimeEntryFormState, string>> & {
 
 const EMPTY_FORM_STATE: TimeEntryFormState = {
     recurso_id: "",
-    alocacao_id: "",
+    os_id: "",
+    projeto_id: "",
     data: new Date().toISOString().split("T")[0],
     hora_inicio: "",
     hora_fim: "",
@@ -80,7 +85,8 @@ const EMPTY_FORM_STATE: TimeEntryFormState = {
 
 const TimeEntryFormSchema = z.object({
     recurso_id: z.string().trim().min(1, "Selecione um recurso"),
-    alocacao_id: z.string().trim().min(1, "Selecione um projeto"),
+    os_id: z.string().trim().min(1, "Selecione uma Ordem de Serviço"),
+    projeto_id: z.string().optional(),
     data: z.string().trim().min(1, "Informe a data"),
     hora_inicio: z.string().trim().min(1, "Informe a hora de início"),
     hora_fim: z.string().trim().min(1, "Informe a hora de fim"),
@@ -126,16 +132,6 @@ function calculateHours(horaInicio?: string | null, horaFim?: string | null) {
     };
 }
 
-function getProjectTitle(alloc: any) {
-    // Prefer a joined title if available, otherwise fall back to IDs
-    return (
-        alloc?.solicitacao?.titulo ||
-        alloc?.solicitacao_id ||
-        alloc?.ordem_servico_id ||
-        "Projeto não informado"
-    );
-}
-
 function formatMinutesToHours(totalMinutes?: number | null) {
     if (typeof totalMinutes !== "number" || Number.isNaN(totalMinutes)) return "0h00";
     const hours = Math.floor(totalMinutes / 60);
@@ -162,6 +158,8 @@ export default function ApontamentoPage() {
     const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
     const [resources, setResources] = useState<ResourceWithEntries[]>([]);
+    const [availableOSs, setAvailableOSs] = useState<any[]>([]);
+    const [availableRSs, setAvailableRSs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -187,12 +185,6 @@ export default function ApontamentoPage() {
         return null;
     }, [activeEntryId, resources]);
 
-    const alocacoesDoRecursoSelecionado = useMemo(() => {
-        if (!formState.recurso_id) return [];
-        const res = resources.find((r) => r.id === formState.recurso_id);
-        return res?.alocacoes ?? [];
-    }, [formState.recurso_id, resources]);
-
     const loadData = useCallback(async () => {
         if (!supabase) {
             setError("Supabase não configurado");
@@ -209,6 +201,7 @@ export default function ApontamentoPage() {
             const nextMonth = new Date(parseInt(year), parseInt(month), 1);
             const endDate = new Date(nextMonth.getTime() - 1).toISOString().split("T")[0];
 
+            // Carregar Recursos e Alocações
             const { data: resourcesData, error: resourcesError } = await supabase
                 .from("C_RECURSOS_FORNECEDOR")
                 .select(`
@@ -219,13 +212,14 @@ export default function ApontamentoPage() {
                     ),
                     alocacoes:C_ALOCACOES_RECURSOS (
                         id,
-                                solicitacao_id,
-                                recurso_fornecedor_id,
+                        solicitacao_id,
+                        recurso_fornecedor_id,
                         ordem_servico_id,
                         papel,
                         inicio_alocacao,
                         fim_alocacao,
                         solicitacao:C_REQUISICOES_SERVICO ( codigo_rs, titulo ),
+                        ordem_servico:C_ORDENS_SERVICO ( numero_os ),
                         apontamentos:C_APONTAMENTOS_TEMPO (
                             id,
                             alocacao_id,
@@ -243,6 +237,30 @@ export default function ApontamentoPage() {
 
             if (resourcesError) throw resourcesError;
 
+            // Carregar OSs para o dropdown
+            const { data: osData, error: osError } = await supabase
+                .from("C_ORDENS_SERVICO")
+                .select(`
+                    id,
+                    numero_os,
+                    contrato:C_CONTRATOS_FORNECEDOR!inner (
+                        fornecedor_id
+                    )
+                `);
+
+            if (osError) throw osError;
+            setAvailableOSs(osData || []);
+
+            // Carregar RSs (Projetos) para o dropdown
+            const { data: rsData, error: rsError } = await supabase
+                .from("C_REQUISICOES_SERVICO")
+                .select("id, codigo_rs, titulo")
+                .neq("status", "encerrada")
+                .order("titulo");
+
+            if (rsError) throw rsError;
+            setAvailableRSs(rsData || []);
+
             const processedResources: ResourceWithEntries[] = (resourcesData || []).map((res: any) => {
                 const allEntries: TimeEntry[] = [];
                 const allocations = res.alocacoes || [];
@@ -254,14 +272,17 @@ export default function ApontamentoPage() {
                             const hoursCalc = calculateHours(entry.hora_inicio, entry.hora_fim);
                             const horasTotal = hoursCalc.total ?? entry.horas ?? 0;
                             const horasMinutos = hoursCalc.totalMinutes ?? (entry.horas ? Math.round(entry.horas * 60) : null);
-                            const projetoLabel = getProjectTitle(alloc);
-                            const projetoTitulo = alloc.solicitacao?.titulo ?? null;
+
+                            // Formata o título do projeto com RS e OS
+                            const rsTitulo = alloc.solicitacao?.titulo || "Sem título";
+                            const osNumero = alloc.ordem_servico?.numero_os ? `(OS: ${alloc.ordem_servico.numero_os})` : "";
+                            const projetoLabel = `${rsTitulo} ${osNumero}`.trim();
 
                             allEntries.push({
                                 id: entry.id,
                                 recurso_id: res.id,
                                 alocacao_id: alloc.id,
-                                projeto: projetoTitulo ?? projetoLabel,
+                                projeto: projetoLabel,
                                 data: entry.data_trabalho,
                                 horas: horasTotal,
                                 horasEmMinutos: horasMinutos,
@@ -343,9 +364,15 @@ export default function ApontamentoPage() {
     const openEditForm = (entry: TimeEntry, recursoId: string) => {
         setFormMode("edit");
         setActiveEntryId(entry.id);
+
+        // Encontrar a alocação para preencher OS e Projeto
+        const resource = resources.find(r => r.id === recursoId);
+        const allocation = resource?.alocacoes?.find(a => a.id === entry.alocacao_id);
+
         setFormState({
             recurso_id: recursoId,
-            alocacao_id: entry.alocacao_id,
+            os_id: allocation?.ordem_servico_id || "",
+            projeto_id: allocation?.solicitacao_id || "",
             data: entry.data,
             hora_inicio: entry.hora_inicio || "",
             hora_fim: entry.hora_fim || "",
@@ -360,7 +387,8 @@ export default function ApontamentoPage() {
     ) => {
         const { name, value } = event.target;
         if (name === "recurso_id") {
-            setFormState((prev) => ({ ...prev, recurso_id: value, alocacao_id: "" }));
+            // Ao mudar recurso, reseta OS e Projeto
+            setFormState((prev) => ({ ...prev, recurso_id: value, os_id: "", projeto_id: "" }));
             return;
         }
         setFormState((prev) => ({ ...prev, [name]: value }));
@@ -394,14 +422,40 @@ export default function ApontamentoPage() {
                 throw new Error("Recurso não encontrado");
             }
 
-            const allocation = selectedResource.alocacoes?.find((a) => a.id === formState.alocacao_id);
+            // Buscar alocação existente ou criar nova
+            let query = supabase
+                .from("C_ALOCACOES_RECURSOS")
+                .select("id")
+                .eq("recurso_fornecedor_id", formState.recurso_id)
+                .eq("ordem_servico_id", formState.os_id);
 
-            if (!allocation) {
-                setFormErrors({
-                    general: "Este recurso não possui alocação ativa. Não é possível lançar horas."
-                });
-                setSubmitting(false);
-                return;
+            if (formState.projeto_id) {
+                query = query.eq("solicitacao_id", formState.projeto_id);
+            } else {
+                query = query.is("solicitacao_id", null);
+            }
+
+            const { data: existingAlloc, error: findError } = await query.maybeSingle();
+
+            if (findError) throw findError;
+
+            let finalAllocationId = existingAlloc?.id;
+
+            if (!finalAllocationId) {
+                // Criar nova alocação
+                const { data: newAlloc, error: createError } = await supabase
+                    .from("C_ALOCACOES_RECURSOS")
+                    .insert({
+                        recurso_fornecedor_id: formState.recurso_id,
+                        ordem_servico_id: formState.os_id,
+                        solicitacao_id: formState.projeto_id || null,
+                        inicio_alocacao: formState.data // Data do apontamento como início
+                    })
+                    .select("id")
+                    .single();
+
+                if (createError) throw createError;
+                finalAllocationId = newAlloc.id;
             }
 
             const hoursCalc = calculateHours(formState.hora_inicio, formState.hora_fim);
@@ -418,7 +472,7 @@ export default function ApontamentoPage() {
                 const { error: insertError } = await supabase
                     .from("C_APONTAMENTOS_TEMPO")
                     .insert({
-                        alocacao_id: allocation.id,
+                        alocacao_id: finalAllocationId,
                         data_trabalho: formState.data,
                         hora_inicio: formState.hora_inicio,
                         hora_fim: formState.hora_fim,
@@ -428,9 +482,12 @@ export default function ApontamentoPage() {
 
                 if (insertError) throw insertError;
             } else if (formMode === "edit" && activeEntryId) {
+                // Nota: Se mudou a alocação (OS/Projeto), o update deve atualizar o alocacao_id também?
+                // Sim, se o usuário mudou OS/Projeto, o apontamento deve apontar para a nova alocação.
                 const { error: updateError } = await supabase
                     .from("C_APONTAMENTOS_TEMPO")
                     .update({
+                        alocacao_id: finalAllocationId, // Atualiza alocação caso tenha mudado
                         data_trabalho: formState.data,
                         hora_inicio: formState.hora_inicio,
                         hora_fim: formState.hora_fim,
@@ -469,6 +526,17 @@ export default function ApontamentoPage() {
         } catch (err) {
             console.error("Erro ao aprovar apontamento", err);
         }
+    };
+
+    // Helper para filtrar OSs do fornecedor selecionado
+    const getSupplierOSs = () => {
+        if (!formState.recurso_id) return [];
+        const resource = resources.find(r => r.id === formState.recurso_id);
+        if (!resource) return [];
+
+        return availableOSs.filter((os: any) =>
+            os.contrato?.fornecedor_id === resource.fornecedor_id
+        );
     };
 
     return (
@@ -666,20 +734,14 @@ export default function ApontamentoPage() {
                                 </Accordion.Item>
                             ))}
                         </Accordion.Root>
-
-                        {filteredResources.length === 0 && (
-                            <div className="py-12 text-center text-neutral-500">
-                                Nenhum recurso encontrado
-                            </div>
-                        )}
                     </Card>
                 )}
 
                 <Dialog.Root open={formOpen} onOpenChange={handleFormDialogChange}>
                     <Dialog.Portal>
-                        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-                        <Dialog.Content className="fixed left-[50%] top-[50%] z-50 max-h-[85vh] w-[90vw] max-w-[500px] translate-x-[-50%] translate-y-[-50%] overflow-y-auto rounded-xl border border-neutral-200 bg-white p-6 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]">
-                            <div className="flex items-start justify-between">
+                        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm transition-opacity" />
+                        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-xl transition-all">
+                            <div className="flex items-center justify-between">
                                 <Dialog.Title className="text-xl font-semibold text-neutral-900">
                                     {formMode === "create" ? "Novo Apontamento" : "Editar Apontamento"}
                                 </Dialog.Title>
@@ -731,34 +793,54 @@ export default function ApontamentoPage() {
                                 </div>
 
                                 <div>
-                                    <label htmlFor="alocacao_id" className="block text-sm font-medium text-neutral-700">
-                                        Projeto <span className="text-danger">*</span>
+                                    <label htmlFor="os_id" className="block text-sm font-medium text-neutral-700">
+                                        Ordem de Serviço (OS) <span className="text-danger">*</span>
                                     </label>
                                     <select
-                                        id="alocacao_id"
-                                        name="alocacao_id"
-                                        value={formState.alocacao_id}
+                                        id="os_id"
+                                        name="os_id"
+                                        value={formState.os_id}
                                         onChange={handleInputChange}
-                                        className={inputClassName(!!formErrors.alocacao_id)}
+                                        className={inputClassName(!!formErrors.os_id)}
                                         disabled={!formState.recurso_id}
                                     >
                                         <option value="">
                                             {formState.recurso_id
-                                                ? "Selecione o projeto"
+                                                ? "Selecione a OS"
                                                 : "Selecione um recurso primeiro"}
                                         </option>
-                                        {alocacoesDoRecursoSelecionado.map((alloc) => {
-                                            const projectName =
-                                                alloc.solicitacao?.titulo || getProjectTitle(alloc);
-                                            return (
-                                                <option key={alloc.id} value={alloc.id}>
-                                                    {projectName}
-                                                </option>
-                                            );
-                                        })}
+                                        {getSupplierOSs().map((os: any) => (
+                                            <option key={os.id} value={os.id}>
+                                                {os.numero_os}
+                                            </option>
+                                        ))}
                                     </select>
-                                    {formErrors.alocacao_id && (
-                                        <p className="mt-1 text-xs text-danger">{formErrors.alocacao_id}</p>
+                                    {formErrors.os_id && (
+                                        <p className="mt-1 text-xs text-danger">{formErrors.os_id}</p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label htmlFor="projeto_id" className="block text-sm font-medium text-neutral-700">
+                                        Projeto (RS) <span className="text-neutral-400 text-xs font-normal">(Opcional)</span>
+                                    </label>
+                                    <select
+                                        id="projeto_id"
+                                        name="projeto_id"
+                                        value={formState.projeto_id}
+                                        onChange={handleInputChange}
+                                        className={inputClassName(!!formErrors.projeto_id)}
+                                        disabled={!formState.recurso_id}
+                                    >
+                                        <option value="">Sem projeto</option>
+                                        {availableRSs.map((rs: any) => (
+                                            <option key={rs.id} value={rs.id}>
+                                                {rs.titulo} ({rs.codigo_rs})
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {formErrors.projeto_id && (
+                                        <p className="mt-1 text-xs text-danger">{formErrors.projeto_id}</p>
                                     )}
                                 </div>
 
