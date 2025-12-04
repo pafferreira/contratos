@@ -21,7 +21,12 @@ type RS = {
   status: RSStatus;
   period: string;
   value: number | null;
+
   owner: string;
+  responsavel_cliente: string;
+  responsavel_bu: string;
+  raw_inicio: string | null;
+  raw_fim: string | null;
 };
 
 type ESPRow = {
@@ -31,6 +36,8 @@ type ESPRow = {
   titulo: string | null;
   contrato?: { id: string; numero_contrato: string | null } | null;
   descricao?: string | null;
+  data_inicio?: string | null;
+  data_fim?: string | null;
   valor_total: number | null;
   valor_comprometido: number | null;
   valor_disponivel: number | null;
@@ -54,6 +61,7 @@ type RSRow = {
   fim_real: string | null;
   responsavel_cliente: string | null;
   responsavel_bu: string | null;
+  valor_total: number | null;
 };
 
 type ESP = {
@@ -63,6 +71,8 @@ type ESP = {
   code: string;
   title: string;
   descricao: string;
+  data_inicio: string | null;
+  data_fim: string | null;
   value: number | null;
   valor_comprometido: number | null;
   rsList: RS[];
@@ -109,6 +119,8 @@ export default function RSPage() {
     contrato_id: "",
     titulo: "",
     descricao: "",
+    data_inicio: "",
+    data_fim: "",
     valor_total: "",
     valor_total_display: "",
     valor_comprometido: "",
@@ -123,7 +135,9 @@ export default function RSPage() {
     inicio_planejado: "",
     fim_planejado: "",
     responsavel_cliente: "",
-    responsavel_bu: ""
+    responsavel_bu: "",
+    valor_total: "",
+    valor_total_display: ""
   });
   const [savingEsp, setSavingEsp] = useState(false);
   const [savingRs, setSavingRs] = useState(false);
@@ -140,8 +154,14 @@ export default function RSPage() {
 
   const formatPeriod = (inicio?: string | null, fim?: string | null) => {
     if (!inicio && !fim) return "Período não informado";
-    if (inicio && fim) return `${inicio} - ${fim}`;
-    return inicio ? `${inicio} - ?` : `? - ${fim}`;
+    const formatDate = (d: string) => {
+      if (!d) return "?";
+      const [y, m, day] = d.split("-");
+      return `${day}/${m}/${y}`;
+    };
+    const i = inicio ? formatDate(inicio) : "?";
+    const f = fim ? formatDate(fim) : "?";
+    return `${i} - ${f}`;
   };
 
   const mapRs = (rows: RSRow[]): RS[] =>
@@ -152,8 +172,12 @@ export default function RSPage() {
       title: rs.titulo ?? "Título não informado",
       status: (rs.status as RSStatus) ?? "planejada",
       period: formatPeriod(rs.inicio_planejado ?? rs.inicio_real, rs.fim_planejado ?? rs.fim_real),
-      value: null,
-      owner: rs.responsavel_cliente ?? rs.responsavel_bu ?? "Responsável não informado"
+      value: rs.valor_total ?? null,
+      responsavel_cliente: rs.responsavel_cliente ?? "—",
+      responsavel_bu: rs.responsavel_bu ?? "—",
+      owner: "", // Deprecated
+      raw_inicio: rs.inicio_planejado ?? rs.inicio_real ?? null,
+      raw_fim: rs.fim_planejado ?? rs.fim_real ?? null
     }));
 
   const loadData = useCallback(async () => {
@@ -174,6 +198,9 @@ export default function RSPage() {
         contrato_id,
         numero_especificacao,
         titulo,
+        descricao,
+        data_inicio,
+        data_fim,
         valor_total,
         valor_comprometido,
         valor_disponivel,
@@ -188,6 +215,7 @@ export default function RSPage() {
           fim_real,
           responsavel_cliente,
           responsavel_bu,
+          valor_total,
           especificacao_id
         ),
         contrato:C_CONTRATOS_CLIENTE (
@@ -211,6 +239,8 @@ export default function RSPage() {
       code: esp.numero_especificacao ?? esp.id,
       title: esp.titulo ?? "Título não informado",
       descricao: esp.descricao ?? "",
+      data_inicio: esp.data_inicio ?? null,
+      data_fim: esp.data_fim ?? null,
       value: typeof esp.valor_total === "number" ? Number(esp.valor_total) : null,
       valor_comprometido:
         typeof esp.valor_comprometido === "number" ? Number(esp.valor_comprometido) : null,
@@ -246,6 +276,8 @@ export default function RSPage() {
       contrato_id: "",
       titulo: "",
       descricao: "",
+      data_inicio: "",
+      data_fim: "",
       valor_total: "",
       valor_total_display: "",
       valor_comprometido: "",
@@ -265,6 +297,8 @@ export default function RSPage() {
         contrato_id: esp.contractId ?? "",
         titulo: esp.title ?? "",
         descricao: esp.descricao ?? "",
+        data_inicio: esp.data_inicio ?? "",
+        data_fim: esp.data_fim ?? "",
         valor_total: esp.value?.toString() ?? "",
         valor_total_display: formatCurrency(esp.value ?? null),
         valor_comprometido: esp.valor_comprometido?.toString() ?? "",
@@ -287,7 +321,9 @@ export default function RSPage() {
       inicio_planejado: "",
       fim_planejado: "",
       responsavel_cliente: "",
-      responsavel_bu: ""
+      responsavel_bu: "",
+      valor_total: "",
+      valor_total_display: ""
     });
     setRsDialogOpen(true);
   };
@@ -305,10 +341,12 @@ export default function RSPage() {
         codigo_rs: rs.code,
         titulo: rs.title,
         status: rs.status,
-        inicio_planejado: rs.period.split(" - ")[0] ?? "",
-        fim_planejado: rs.period.split(" - ")[1] ?? "",
-        responsavel_cliente: rs.owner,
-        responsavel_bu: ""
+        inicio_planejado: rs.raw_inicio ?? "",
+        fim_planejado: rs.raw_fim ?? "",
+        responsavel_cliente: rs.responsavel_cliente === "—" ? "" : rs.responsavel_cliente,
+        responsavel_bu: rs.responsavel_bu === "—" ? "" : rs.responsavel_bu,
+        valor_total: rs.value?.toString() ?? "",
+        valor_total_display: formatCurrency(rs.value ?? null)
       });
     }
     setRsDialogOpen(true);
@@ -323,6 +361,8 @@ export default function RSPage() {
       contrato_id: espForm.contrato_id.trim() || null,
       titulo: espForm.titulo.trim() || null,
       descricao: espForm.descricao.trim() || null,
+      data_inicio: espForm.data_inicio || null,
+      data_fim: espForm.data_fim || null,
       valor_total: espForm.valor_total ? Number(espForm.valor_total) : null,
       valor_comprometido: espForm.valor_comprometido ? Number(espForm.valor_comprometido) : null
     };
@@ -342,6 +382,8 @@ export default function RSPage() {
       contrato_id: "",
       titulo: "",
       descricao: "",
+      data_inicio: "",
+      data_fim: "",
       valor_total: "",
       valor_total_display: "",
       valor_comprometido: "",
@@ -363,7 +405,8 @@ export default function RSPage() {
       inicio_planejado: rsForm.inicio_planejado || null,
       fim_planejado: rsForm.fim_planejado || null,
       responsavel_cliente: rsForm.responsavel_cliente || null,
-      responsavel_bu: rsForm.responsavel_bu || null
+      responsavel_bu: rsForm.responsavel_bu || null,
+      valor_total: rsForm.valor_total ? Number(rsForm.valor_total) : null
     };
     const query = supabase.from("C_REQUISICOES_SERVICO");
     const response =
@@ -384,7 +427,9 @@ export default function RSPage() {
       inicio_planejado: "",
       fim_planejado: "",
       responsavel_cliente: "",
-      responsavel_bu: ""
+      responsavel_bu: "",
+      valor_total: "",
+      valor_total_display: ""
     });
     setRsDialogOpen(false);
     await loadData();
@@ -450,99 +495,81 @@ export default function RSPage() {
         ) : null}
         <Accordion.Root type="single" collapsible>
           {espData.map((esp) => (
-            <Accordion.Item key={esp.id} value={esp.id} className="border-b border-neutral-100">
-              <Accordion.Header>
-                <Accordion.Trigger
+            <Accordion.Item key={esp.id} value={esp.id} className="group border-b-2 border-neutral-200">
+              <Accordion.Header className="flex w-full">
+                <div
                   className={clsx(
-                    "flex w-full items-center justify-between gap-4 px-4 py-3 text-left focus:outline-none",
-                    "transition-colors data-[state=open]:bg-neutral-50",
+                    "flex w-full items-start",
+                    "transition-all duration-200",
                     espDialogOpen && espDialogMode === "edit" && espForm.id === esp.id
-                      ? "border-l-4 border-brand-500 bg-brand-50"
-                      : "hover:bg-neutral-50"
+                      ? "border-l-4 border-brand-600 bg-brand-50"
+                      : "hover:bg-neutral-50 group-data-[state=open]:bg-blue-50 group-data-[state=open]:border-l-4 group-data-[state=open]:border-blue-500"
                   )}
                 >
-                  <div className="flex flex-1 items-center gap-3">
-                    <ChevronDown
-                      className="size-4 text-neutral-400 transition-transform data-[state=open]:rotate-180"
-                      aria-hidden
-                    />
-                    <div className="w-32 flex-shrink-0">
-                      <p className="text-xs uppercase tracking-wide text-neutral-500">ESP</p>
-                      <p className="font-semibold text-neutral-900">{esp.code}</p>
-                    </div>
-                    <div className="w-32 flex-shrink-0">
-                      <p className="text-xs uppercase tracking-wide text-neutral-500">Contrato</p>
-                      <p className="font-medium text-neutral-800">{esp.contractNumber}</p>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs uppercase tracking-wide text-neutral-500">Título</p>
-                      <p className="truncate font-medium text-neutral-900">{esp.title}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <p className="text-sm font-semibold text-neutral-900">
-                      {formatCurrency(esp.value)}
-                    </p>
-                    <Tooltip.Provider delayDuration={150}>
-                      <div className="flex gap-2">
-                        <Tooltip.Root>
-                          <Tooltip.Trigger asChild>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              aria-label="Editar ESP"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                openEditEsp(esp.id);
-                              }}
-                            >
-                              <Pencil className="size-4" />
-                            </Button>
-                          </Tooltip.Trigger>
-                          <Tooltip.Portal>
-                            <Tooltip.Content
-                              side="top"
-                              sideOffset={6}
-                              className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-                            >
-                              Editar ESP
-                              <Tooltip.Arrow className="fill-white" />
-                            </Tooltip.Content>
-                          </Tooltip.Portal>
-                        </Tooltip.Root>
-                        <Tooltip.Root>
-                          <Tooltip.Trigger asChild>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="text-danger"
-                              aria-label="Excluir ESP"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setConfirmDeleteEspId(esp.id);
-                              }}
-                              disabled={deletingEspId === esp.id || !supabase}
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </Tooltip.Trigger>
-                          <Tooltip.Portal>
-                            <Tooltip.Content
-                              side="top"
-                              sideOffset={6}
-                              className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
-                            >
-                              Excluir ESP
-                              <Tooltip.Arrow className="fill-white" />
-                            </Tooltip.Content>
-                          </Tooltip.Portal>
-                        </Tooltip.Root>
+                  <Accordion.Trigger className="flex flex-1 flex-col px-4 text-left focus:outline-none">
+                    <div className="flex w-full items-start gap-3 pt-3 pb-1">
+                      <ChevronDown
+                        className="mt-1 size-4 flex-shrink-0 text-neutral-400 transition-transform group-data-[state=open]:rotate-180"
+                        aria-hidden
+                      />
+                      <div className="grid flex-1 grid-cols-11 items-start gap-3">
+                        <div className="col-span-2">
+                          <p className="text-xs uppercase tracking-wide text-neutral-500">ESP</p>
+                          <p className="truncate font-semibold text-neutral-900">{esp.code}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-xs uppercase tracking-wide text-neutral-500">Contrato</p>
+                          <p className="truncate font-medium text-neutral-800">{esp.contractNumber}</p>
+                        </div>
+                        <div className="col-span-5">
+                          <p className="text-xs uppercase tracking-wide text-neutral-500">Título</p>
+                          <p className="truncate font-medium text-neutral-900">{esp.title}</p>
+                        </div>
+                        <div className="col-span-2 flex flex-col items-end gap-0.5">
+                          <p className="text-xs uppercase tracking-wide text-neutral-500">Valor Total</p>
+                          <p className="text-sm font-semibold text-neutral-900">
+                            {formatCurrency(esp.value)}
+                          </p>
+                        </div>
                       </div>
-                    </Tooltip.Provider>
+                    </div>
+                    <div className="flex items-center gap-2 -mt-1 pb-2 pl-7 text-xs text-neutral-600">
+                      <span className="font-medium">Vigência:</span>
+                      <span>{formatPeriod(esp.data_inicio, esp.data_fim)}</span>
+                    </div>
+                  </Accordion.Trigger>
+
+                  <div className="flex w-16 flex-col items-end gap-1 pr-4 pt-3">
+                    <p className="text-xs uppercase tracking-wide text-neutral-500">Ações</p>
+                    <div className="flex flex-col gap-1">
+                      <Button
+                        className="h-6 w-6 p-0 text-neutral-600 hover:text-brand-600"
+                        variant="ghost"
+                        aria-label="Editar ESP"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          openEditEsp(esp.id);
+                        }}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
+                        variant="ghost"
+                        aria-label="Excluir ESP"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setConfirmDeleteEspId(esp.id);
+                        }}
+                        disabled={deletingEspId === esp.id || !supabase}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
                   </div>
-                </Accordion.Trigger>
+                </div>
               </Accordion.Header>
-              <Accordion.Content className="bg-neutral-25 px-4 pb-4">
+              <Accordion.Content className="bg-yellow-50 px-4 pb-4">
                 <div className="flex items-center justify-between border-b border-neutral-100 py-3">
                   <div>
                     <p className="text-sm font-semibold text-neutral-900">RS vinculadas</p>
@@ -564,7 +591,8 @@ export default function RSPage() {
                         <th className="px-2 py-3">Status</th>
                         <th className="px-2 py-3">Período</th>
                         <th className="px-2 py-3 text-right">Valor</th>
-                        <th className="px-2 py-3">Owner</th>
+                        <th className="px-2 py-3">Owner Cliente</th>
+                        <th className="px-2 py-3">Owner BU</th>
                         <th className="px-2 py-3 text-right">Ações</th>
                       </tr>
                     </thead>
@@ -595,7 +623,8 @@ export default function RSPage() {
                           <td className="px-2 py-3 text-right font-medium text-neutral-900">
                             {formatCurrency(rs.value)}
                           </td>
-                          <td className="px-2 py-3">{rs.owner}</td>
+                          <td className="px-2 py-3">{rs.responsavel_cliente}</td>
+                          <td className="px-2 py-3">{rs.responsavel_bu}</td>
                           <td className="px-2 py-3 text-right">
                             <Tooltip.Provider delayDuration={150}>
                               <div className="flex justify-end gap-2">
@@ -672,12 +701,12 @@ export default function RSPage() {
                   Informe o contrato, título e valor total da ESP.
                 </Dialog.Description>
               </div>
-                <Dialog.Close asChild>
-                  <Button variant="ghost" size="icon" aria-label="Fechar modal ESP">
-                    <X className="size-4" />
-                  </Button>
-                </Dialog.Close>
-              </div>
+              <Dialog.Close asChild>
+                <Button variant="ghost" size="icon" aria-label="Fechar modal ESP">
+                  <X className="size-4" />
+                </Button>
+              </Dialog.Close>
+            </div>
             <form className="mt-4 space-y-4" onSubmit={handleEspSubmit}>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
@@ -726,6 +755,30 @@ export default function RSPage() {
                   }
                   placeholder="Descreva a ESP"
                 />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-neutral-700">Início de Vigência</label>
+                  <input
+                    type="date"
+                    className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm"
+                    value={espForm.data_inicio}
+                    onChange={(e) =>
+                      setEspForm((prev) => ({ ...prev, data_inicio: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-neutral-700">Fim de Vigência</label>
+                  <input
+                    type="date"
+                    className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm"
+                    value={espForm.data_fim}
+                    onChange={(e) =>
+                      setEspForm((prev) => ({ ...prev, data_fim: e.target.value }))
+                    }
+                  />
+                </div>
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-neutral-700">Valor total (R$)</label>
@@ -789,11 +842,11 @@ export default function RSPage() {
                   Relacione a RS a uma ESP e preencha os dados principais.
                 </Dialog.Description>
               </div>
-                <Dialog.Close asChild>
-                  <Button variant="ghost" size="icon" aria-label="Fechar modal RS">
-                    <X className="size-4" />
-                  </Button>
-                </Dialog.Close>
+              <Dialog.Close asChild>
+                <Button variant="ghost" size="icon" aria-label="Fechar modal RS">
+                  <X className="size-4" />
+                </Button>
+              </Dialog.Close>
             </div>
             <form className="mt-4 space-y-4" onSubmit={handleRsSubmit}>
               <div className="space-y-1.5">
@@ -853,9 +906,22 @@ export default function RSPage() {
                   required
                 />
               </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-neutral-700">Valor Total (R$)</label>
+                <input
+                  className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm"
+                  inputMode="numeric"
+                  placeholder="R$ 0,00"
+                  value={rsForm.valor_total_display}
+                  onChange={(e) => {
+                    const { raw, display } = normalizeCurrencyInput(e.target.value);
+                    setRsForm((prev) => ({ ...prev, valor_total: raw, valor_total_display: display }));
+                  }}
+                />
+              </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-neutral-700">Responsável</label>
+                  <label className="text-sm font-medium text-neutral-700">Responsável Cliente</label>
                   <input
                     className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm"
                     value={rsForm.responsavel_cliente}
