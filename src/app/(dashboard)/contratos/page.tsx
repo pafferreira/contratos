@@ -316,8 +316,8 @@ export default function ContratosPage() {
         }
         setError(
           contractError?.message ??
-            clientError?.message ??
-            "Não foi possível carregar os contratos. Verifique se os nomes das tabelas coincidem com o Supabase."
+          clientError?.message ??
+          "Não foi possível carregar os contratos. Verifique se os nomes das tabelas coincidem com o Supabase."
         );
       } else {
         const normalizedContracts: ContractRecord[] = (contractData ?? []).map((contract) => {
@@ -501,9 +501,9 @@ export default function ContratosPage() {
       formMode === "create"
         ? supabase.from(CONTRACTS_TABLE).insert(supabasePayload)
         : supabase
-            .from(CONTRACTS_TABLE)
-            .update(supabasePayload)
-            .eq("id", activeContractId ?? "");
+          .from(CONTRACTS_TABLE)
+          .update(supabasePayload)
+          .eq("id", activeContractId ?? "");
 
     const { error: mutationError } = await mutation;
 
@@ -822,7 +822,6 @@ export default function ContratosPage() {
                     <div className="font-semibold text-neutral-900">
                       {contract.numero_contrato}
                     </div>
-                    <p className="text-xs text-neutral-500">{contract.id}</p>
                   </td>
                   <td className="px-3 py-4">
                     {contract.cliente?.nome ??
@@ -1146,7 +1145,7 @@ export default function ContratosPage() {
               </Dialog.Title>
               <Dialog.Close asChild>
                 <Button variant="ghost" size="icon" aria-label="Fechar formulário">
-                    <X className="size-4" />
+                  <X className="size-4" />
                 </Button>
               </Dialog.Close>
             </div>
@@ -1491,7 +1490,7 @@ export default function ContratosPage() {
               </Dialog.Title>
               <Dialog.Close asChild>
                 <Button variant="ghost" size="icon" aria-label="Fechar confirmação">
-                <X className="size-4" />
+                  <X className="size-4" />
                 </Button>
               </Dialog.Close>
             </div>
@@ -1499,8 +1498,8 @@ export default function ContratosPage() {
               Confirma a exclusão do contrato {" "}
               <span className="font-semibold text-neutral-800">
                 {pendingContract?.numero_contrato}
-              </span>{" "} ?  
-               <p>Essa ação não pode ser desfeita.</p>
+              </span>{" "} ?
+              <p>Essa ação não pode ser desfeita.</p>
             </Dialog.Description>
 
             {deleteError ? (
