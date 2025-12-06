@@ -539,32 +539,64 @@ export default function RSPage() {
                     </div>
                   </Accordion.Trigger>
 
-                  <div className="flex w-16 flex-col items-end gap-1 pr-4 pt-3">
+                  <div className="flex flex-col items-end gap-1 pr-4 pt-3 min-w-[6rem]">
                     <p className="text-xs uppercase tracking-wide text-neutral-500">Ações</p>
-                    <div className="flex flex-col gap-1">
-                      <Button
-                        className="h-6 w-6 p-0 text-neutral-600 hover:text-brand-600"
-                        variant="ghost"
-                        aria-label="Editar ESP"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          openEditEsp(esp.id);
-                        }}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
-                        variant="ghost"
-                        aria-label="Excluir ESP"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setConfirmDeleteEspId(esp.id);
-                        }}
-                        disabled={deletingEspId === esp.id || !supabase}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Tooltip.Provider delayDuration={150}>
+                        <Tooltip.Root>
+                          <Tooltip.Trigger asChild>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-8 w-8 text-neutral-600 hover:text-brand-600 hover:bg-brand-50"
+                              aria-label="Editar ESP"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                openEditEsp(esp.id);
+                              }}
+                            >
+                              <Pencil className="size-5" />
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content
+                              side="top"
+                              sideOffset={6}
+                              className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                            >
+                              Editar ESP
+                              <Tooltip.Arrow className="fill-white" />
+                            </Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                        <Tooltip.Root>
+                          <Tooltip.Trigger asChild>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              aria-label="Excluir ESP"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setConfirmDeleteEspId(esp.id);
+                              }}
+                              disabled={deletingEspId === esp.id || !supabase}
+                            >
+                              <Trash2 className="size-5" />
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content
+                              side="top"
+                              sideOffset={6}
+                              className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+                            >
+                              Excluir ESP
+                              <Tooltip.Arrow className="fill-white" />
+                            </Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                      </Tooltip.Provider>
                     </div>
                   </div>
                 </div>
@@ -632,11 +664,12 @@ export default function RSPage() {
                                   <Tooltip.Trigger asChild>
                                     <Button
                                       size="icon"
-                                      variant="ghost"
+                                      variant="outline"
+                                      className="h-8 w-8 text-neutral-600 hover:text-brand-600 hover:bg-brand-50"
                                       aria-label="Editar RS"
                                       onClick={() => openEditRs(esp.id, rs.id)}
                                     >
-                                      <Pencil className="size-4" />
+                                      <Pencil className="size-5" />
                                     </Button>
                                   </Tooltip.Trigger>
                                   <Tooltip.Portal>
@@ -654,13 +687,13 @@ export default function RSPage() {
                                   <Tooltip.Trigger asChild>
                                     <Button
                                       size="icon"
-                                      variant="ghost"
-                                      className="text-danger"
+                                      variant="outline"
+                                      className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                                       aria-label="Excluir RS"
                                       disabled={deletingRsId === rs.id || !supabase}
                                       onClick={() => setConfirmDeleteRsId(rs.id)}
                                     >
-                                      <Trash2 className="size-4" />
+                                      <Trash2 className="size-5" />
                                     </Button>
                                   </Tooltip.Trigger>
                                   <Tooltip.Portal>
