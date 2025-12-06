@@ -533,13 +533,13 @@ export default function RSPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 -mt-1 pb-2 pl-7 text-xs text-neutral-600">
+                    <div className="-mt-1 flex items-center gap-2 pl-7 pb-2 text-xs text-neutral-600">
                       <span className="font-medium">Vigência:</span>
                       <span>{formatPeriod(esp.data_inicio, esp.data_fim)}</span>
                     </div>
                   </Accordion.Trigger>
 
-                  <div className="flex flex-col items-end gap-1 pr-4 pt-3 min-w-[6rem]">
+                  <div className="flex min-w-24 flex-col items-end gap-1 pr-4 pt-3">
                     <p className="text-xs uppercase tracking-wide text-neutral-500">Ações</p>
                     <div className="flex items-center justify-end gap-1">
                       <Tooltip.Provider delayDuration={150}>
@@ -548,7 +548,7 @@ export default function RSPage() {
                             <Button
                               size="icon"
                               variant="outline"
-                              className="h-8 w-8 text-neutral-600 hover:text-brand-600 hover:bg-brand-50"
+                              className="size-8 text-neutral-600 hover:bg-brand-50 hover:text-brand-600"
                               aria-label="Editar ESP"
                               onClick={(e) => {
                                 e.preventDefault();
@@ -574,7 +574,7 @@ export default function RSPage() {
                             <Button
                               size="icon"
                               variant="outline"
-                              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="size-8 text-red-600 hover:bg-red-50 hover:text-red-700"
                               aria-label="Excluir ESP"
                               onClick={(e) => {
                                 e.preventDefault();
@@ -665,7 +665,7 @@ export default function RSPage() {
                                     <Button
                                       size="icon"
                                       variant="outline"
-                                      className="h-8 w-8 text-neutral-600 hover:text-brand-600 hover:bg-brand-50"
+                                      className="size-8 text-neutral-600 hover:bg-brand-50 hover:text-brand-600"
                                       aria-label="Editar RS"
                                       onClick={() => openEditRs(esp.id, rs.id)}
                                     >
@@ -688,7 +688,7 @@ export default function RSPage() {
                                     <Button
                                       size="icon"
                                       variant="outline"
-                                      className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      className="size-8 text-red-600 hover:bg-red-50 hover:text-red-700"
                                       aria-label="Excluir RS"
                                       disabled={deletingRsId === rs.id || !supabase}
                                       onClick={() => setConfirmDeleteRsId(rs.id)}
@@ -756,7 +756,7 @@ export default function RSPage() {
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-neutral-700">Contrato</label>
                   <select
-                    className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm bg-white"
+                    className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm"
                     value={espForm.contrato_id}
                     onChange={(e) => setEspForm((prev) => ({ ...prev, contrato_id: e.target.value }))}
                   >
@@ -885,7 +885,7 @@ export default function RSPage() {
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-neutral-700">ESP</label>
                 <select
-                  className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm bg-white"
+                  className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm"
                   defaultValue={selectedEspId ?? ""}
                   value={rsForm.especificacao_id}
                   onChange={(e) => setRsForm((prev) => ({ ...prev, especificacao_id: e.target.value }))}
@@ -979,7 +979,7 @@ export default function RSPage() {
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-neutral-700">Status</label>
                 <select
-                  className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm bg-white"
+                  className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm"
                   value={rsForm.status}
                   onChange={(e) => setRsForm((prev) => ({ ...prev, status: e.target.value as RSStatus }))}
                 >
