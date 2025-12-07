@@ -9,7 +9,7 @@ const AUTH_PATHS = ["/signin", "/auth/callback"];
 
 export async function middleware(req: NextRequest) {
   // Retorna 503 Service Unavailable para tudo
-  // return new NextResponse("Site em manutenção", { status: 503 });
+  return new NextResponse("Site em manutenção", { status: 503 });
 
   const res = NextResponse.next();
   const supabase = createMiddlewareClient<Database>({ req, res });
