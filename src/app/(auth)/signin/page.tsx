@@ -10,6 +10,8 @@ export default function SignInPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") ?? "/dashboard";
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? window.location.origin;
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -26,7 +28,7 @@ export default function SignInPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?redirect=${redirectTo}`
+        emailRedirectTo: `${siteUrl}/auth/callback?redirect=${redirectTo}`
       }
     });
     if (error) {
