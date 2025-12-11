@@ -14,18 +14,18 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
   const supabase = createMiddlewareClient<Database>({ req, res });
   const {
-    data: { session }
-  } = await supabase.auth.getSession();
+    data: { user }
+  } = await supabase.auth.getUser();
 
   const pathname = req.nextUrl.pathname;
 
-  if (!session && !AUTH_PATHS.some((path) => pathname.startsWith(path))) {
+  if (!user && !AUTH_PATHS.some((path) => pathname.startsWith(path))) {
     const redirectUrl = new URL("/signin", req.url);
     redirectUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (session && pathname === "/signin") {
+  if (user && pathname === "/signin") {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 

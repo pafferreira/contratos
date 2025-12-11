@@ -3,7 +3,6 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { SupabaseProvider } from "@/components/providers/supabase-provider";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -21,15 +20,11 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createSupabaseServerClient();
-  const session =
-    supabase !== null ? (await supabase.auth.getSession()).data.session : null;
-
   return (
     <html lang="pt-BR" className={inter.variable} suppressHydrationWarning>
       <body>
         <ThemeProvider>
-          <SupabaseProvider initialSession={session}>{children}</SupabaseProvider>
+          <SupabaseProvider initialSession={null}>{children}</SupabaseProvider>
         </ThemeProvider>
       </body>
     </html>
