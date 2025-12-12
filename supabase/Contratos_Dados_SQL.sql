@@ -12,8 +12,7 @@ C_PERFIS_RECURSOS (4),
 C_RECURSOS_FORNECEDOR (4), 
 C_ORDENS_SERVICO (7), 
 C_ALOCACOES_RECURSOS (3), 
-C_APONTAMENTOS_TEMPO (2), 
-sistemas (5), usuarios_sistema_perfis (1).
+C_APONTAMENTOS_TEMPO (2).
 */
 
 psql "host=db.hvpcmturencnduatmqbj.supabase.co port=5432 dbname=postgres user=postgres password=MYPASSWORD sslmode=require" -c "COPY (SELECT * FROM public.\"C_CLIENTES\") TO STDOUT WITH CSV HEADER" > clientes.csv
@@ -31,6 +30,4 @@ COPY (SELECT * FROM public."C_RECURSOS_FORNECEDOR") TO STDOUT WITH CSV HEADER;
 COPY (SELECT * FROM public."C_ORDENS_SERVICO") TO STDOUT WITH CSV HEADER;
 COPY (SELECT * FROM public."C_ALOCACOES_RECURSOS") TO STDOUT WITH CSV HEADER;
 COPY (SELECT * FROM public."C_APONTAMENTOS_TEMPO") TO STDOUT WITH CSV HEADER;
-COPY (SELECT * FROM public.sistemas) TO STDOUT WITH CSV HEADER;
-COPY (SELECT * FROM public.usuarios_sistema_perfis) TO STDOUT WITH CSV HEADER;
 
