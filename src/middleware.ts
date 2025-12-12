@@ -4,6 +4,7 @@ import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
 import type { Database } from "@/lib/supabase/types";
 
 const AUTH_PATHS = ["/signin", "/auth/callback"];
+const PUBLIC_PATHS = ["/users"];
 
 
 
@@ -19,7 +20,11 @@ export async function middleware(req: NextRequest) {
 
   const pathname = req.nextUrl.pathname;
 
-  if (!user && !AUTH_PATHS.some((path) => pathname.startsWith(path))) {
+  if (
+    !user &&
+    !AUTH_PATHS.some((path) => pathname.startsWith(path)) &&
+    !PUBLIC_PATHS.some((path) => pathname.startsWith(path))
+  ) {
     const redirectUrl = new URL("/signin", req.url);
     redirectUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(redirectUrl);

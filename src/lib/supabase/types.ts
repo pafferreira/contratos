@@ -1461,6 +1461,207 @@ export type Database = {
         };
       };
 
+      sistemas: {
+        Row: {
+          id: string;
+          name: string;
+          key: string | null;
+          url: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          key?: string | null;
+          url: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          key?: string | null;
+          url?: string;
+        };
+      };
+
+      usuarios_sistema_perfis: {
+        Row: {
+          id: string;
+          user_id: string;
+          system_id: string;
+          profile: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          system_id: string;
+          profile: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          system_id?: string;
+          profile?: string;
+        };
+      };
+
+      z_sistemas: {
+        Row: {
+          id: string;
+          nome: string;
+          descricao: string | null;
+          ativo: boolean;
+          criado_em: string;
+          atualizado_em: string;
+        };
+        Insert: {
+          id?: string;
+          nome: string;
+          descricao?: string | null;
+          ativo?: boolean;
+          criado_em?: string;
+          atualizado_em?: string;
+        };
+        Update: {
+          id?: string;
+          nome?: string;
+          descricao?: string | null;
+          ativo?: boolean;
+          criado_em?: string;
+          atualizado_em?: string;
+        };
+      };
+
+      z_usuarios: {
+        Row: {
+          id: string;
+          email: string;
+          nome_completo: string | null;
+          senha_hash: string | null;
+          ativo: boolean;
+          criado_em: string;
+          atualizado_em: string;
+        };
+        Insert: {
+          id?: string;
+          email: string;
+          nome_completo?: string | null;
+          senha_hash?: string | null;
+          ativo?: boolean;
+          criado_em?: string;
+          atualizado_em?: string;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          nome_completo?: string | null;
+          senha_hash?: string | null;
+          ativo?: boolean;
+          criado_em?: string;
+          atualizado_em?: string;
+        };
+      };
+
+      z_papeis: {
+        Row: {
+          id: string;
+          sistema_id: string | null;
+          nome: string;
+          descricao: string | null;
+          criado_em: string;
+          atualizado_em: string;
+        };
+        Insert: {
+          id?: string;
+          sistema_id?: string | null;
+          nome: string;
+          descricao?: string | null;
+          criado_em?: string;
+          atualizado_em?: string;
+        };
+        Update: {
+          id?: string;
+          sistema_id?: string | null;
+          nome?: string;
+          descricao?: string | null;
+          criado_em?: string;
+          atualizado_em?: string;
+        };
+      };
+
+      z_permissoes: {
+        Row: {
+          id: string;
+          sistema_id: string | null;
+          recurso: string;
+          acao: string;
+          descricao: string | null;
+          criado_em: string;
+          atualizado_em: string;
+        };
+        Insert: {
+          id?: string;
+          sistema_id?: string | null;
+          recurso: string;
+          acao: string;
+          descricao?: string | null;
+          criado_em?: string;
+          atualizado_em?: string;
+        };
+        Update: {
+          id?: string;
+          sistema_id?: string | null;
+          recurso?: string;
+          acao?: string;
+          descricao?: string | null;
+          criado_em?: string;
+          atualizado_em?: string;
+        };
+      };
+
+      z_usuarios_papeis: {
+        Row: {
+          id: string;
+          usuario_id: string | null;
+          papel_id: string | null;
+          atribuido_por: string | null;
+          atribuido_em: string;
+        };
+        Insert: {
+          id?: string;
+          usuario_id?: string | null;
+          papel_id?: string | null;
+          atribuido_por?: string | null;
+          atribuido_em?: string;
+        };
+        Update: {
+          id?: string;
+          usuario_id?: string | null;
+          papel_id?: string | null;
+          atribuido_por?: string | null;
+          atribuido_em?: string;
+        };
+      };
+
+      z_papeis_permissoes: {
+        Row: {
+          id: string;
+          papel_id: string | null;
+          permissao_id: string | null;
+          criado_em: string;
+        };
+        Insert: {
+          id?: string;
+          papel_id?: string | null;
+          permissao_id?: string | null;
+          criado_em?: string;
+        };
+        Update: {
+          id?: string;
+          papel_id?: string | null;
+          permissao_id?: string | null;
+          criado_em?: string;
+        };
+      };
+
     };
 
   };

@@ -9,10 +9,9 @@ export default function SignInPage() {
   const supabase = createSupabaseBrowserClient();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") ?? "/dashboard";
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? window.location.origin;
+  const redirectTo = searchParams.get("redirect") ?? "/systems";
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -25,19 +24,16 @@ export default function SignInPage() {
       setLoading(false);
       return;
     }
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
-      options: {
-        emailRedirectTo: `${siteUrl}/auth/callback?redirect=${redirectTo}`
-      }
+      password
     });
     if (error) {
-      setMessage("Não foi possível enviar o link de acesso. Tente novamente.");
+      setMessage("Usuário ou senha inválidos. Tente novamente.");
       setLoading(false);
       return;
     }
-    setMessage("Verifique sua caixa de e-mail para acessar a plataforma.");
-    setLoading(false);
+    router.push(redirectTo);
   }
 
   return (
@@ -66,8 +62,23 @@ export default function SignInPage() {
             />
           </div>
 
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-neutral-600" htmlFor="password">
+              Senha
+            </label>
+            <input
+              id="password"
+              type="password"
+              required
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-800 shadow-sm outline-none hocus:border-brand-500"
+              placeholder="••••••••"
+            />
+          </div>
+
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Enviando..." : "Enviar link"}
+            {loading ? "Entrando..." : "Entrar"}
           </Button>
         </form>
 
