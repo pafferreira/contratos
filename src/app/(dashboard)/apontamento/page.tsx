@@ -32,8 +32,14 @@ import { type Database, type TablesRow } from "@/lib/supabase/types";
 type ResourceRow = TablesRow<Database["public"]["Tables"]["C_RECURSOS_FORNECEDOR"]>;
 type SupplierRow = TablesRow<Database["public"]["Tables"]["C_FORNECEDORES"]>;
 type AllocationRow = TablesRow<Database["public"]["Tables"]["C_ALOCACOES_RECURSOS"]> & {
-    solicitacao?: { titulo: string | null } | null;
-    ordem_servico?: { numero_os: string | null } | null;
+    solicitacao?: { titulo: string | null; codigo_rs: string | null } | { titulo: string | null; codigo_rs: string | null }[] | null;
+    ordem_servico?: {
+        numero_os: string | null;
+        perfil_solicitado?: { nome: string | null } | { nome: string | null }[] | null;
+    } | {
+        numero_os: string | null;
+        perfil_solicitado?: { nome: string | null } | { nome: string | null }[] | null;
+    }[] | null;
 };
 
 type TimeEntry = {
@@ -49,11 +55,13 @@ type TimeEntry = {
     hora_fim: string | null;
     descricao: string;
     aprovado: boolean;
+    papel?: string | null;
     created_at?: string;
 };
 
 type ResourceWithEntries = ResourceRow & {
     fornecedor?: Pick<SupplierRow, "id" | "nome"> | null;
+    perfil?: { id: string; nome: string } | null;
     totalHoras: number;
     apontamentos: TimeEntry[];
     alocacoes?: AllocationRow[];
@@ -210,6 +218,10 @@ export default function ApontamentoPage() {
                         id,
                         nome
                     ),
+                    perfil:C_PERFIS_RECURSOS (
+                        id,
+                        nome
+                    ),
                     alocacoes:C_ALOCACOES_RECURSOS (
                         id,
                         solicitacao_id,
@@ -219,7 +231,10 @@ export default function ApontamentoPage() {
                         inicio_alocacao,
                         fim_alocacao,
                         solicitacao:C_REQUISICOES_SERVICO ( codigo_rs, titulo ),
-                        ordem_servico:C_ORDENS_SERVICO ( numero_os ),
+                        ordem_servico:C_ORDENS_SERVICO ( 
+                            numero_os,
+                            perfil_solicitado:C_PERFIS_RECURSOS ( nome )
+                        ),
                         apontamentos:C_APONTAMENTOS_TEMPO (
                             id,
                             alocacao_id,
@@ -273,9 +288,26 @@ export default function ApontamentoPage() {
                             const horasTotal = hoursCalc.total ?? entry.horas ?? 0;
                             const horasMinutos = hoursCalc.totalMinutes ?? (entry.horas ? Math.round(entry.horas * 60) : null);
 
+                            // Supabase retorna arrays em relacionamentos; pegamos o primeiro item
+                            const solicitacao = Array.isArray(alloc.solicitacao) ? alloc.solicitacao[0] : alloc.solicitacao;
+                            const ordemServico = Array.isArray(alloc.ordem_servico) ? alloc.ordem_servico[0] : alloc.ordem_servico;
+
                             // Formata o título do projeto com RS e OS
-                            const rsTitulo = alloc.solicitacao?.titulo || "Sem título";
-                            const osNumero = alloc.ordem_servico?.numero_os ? `(OS: ${alloc.ordem_servico.numero_os})` : "";
+                            const rsTitulo = solicitacao?.titulo || "Sem título";
+
+                            // Limpa o número da OS (remove ::profile::UUID se existir)
+                            let rawOs = ordemServico?.numero_os || "";
+                            if (rawOs.includes("::profile::")) {
+                                rawOs = rawOs.split("::profile::")[0];
+                            }
+
+                            // Pega o nome do perfil solicitado na OS
+                            const perfilSol = Array.isArray(ordemServico?.perfil_solicitado)
+                                ? ordemServico.perfil_solicitado[0]
+                                : ordemServico?.perfil_solicitado;
+                            const perfilNome = perfilSol?.nome;
+
+                            const osNumero = rawOs ? `(OS: ${rawOs}${perfilNome ? ` - ${perfilNome}` : ""})` : "";
                             const projetoLabel = `${rsTitulo} ${osNumero}`.trim();
 
                             allEntries.push({
@@ -290,7 +322,8 @@ export default function ApontamentoPage() {
                                 hora_inicio: entry.hora_inicio,
                                 hora_fim: entry.hora_fim,
                                 descricao: entry.descricao || "",
-                                aprovado: entry.aprovado || false
+                                aprovado: entry.aprovado || false,
+                                papel: alloc.papel
                             });
                         }
                     });
@@ -302,6 +335,8 @@ export default function ApontamentoPage() {
 
                 return {
                     ...res,
+                    fornecedor: Array.isArray(res.fornecedor) ? res.fornecedor[0] : res.fornecedor,
+                    perfil: Array.isArray(res.perfil) ? res.perfil[0] : res.perfil,
                     totalHoras,
                     apontamentos: allEntries,
                     alocacoes: allocations
@@ -619,6 +654,11 @@ export default function ApontamentoPage() {
                                                     </div>
                                                     <div className="mt-1 text-sm text-neutral-500">
                                                         {resource.fornecedor?.nome ?? "Sem fornecedor"}
+                                                        {resource.perfil?.nome && (
+                                                            <span className="ml-2 border-l border-neutral-300 pl-2">
+                                                                {resource.perfil.nome}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 <Tooltip>
@@ -667,6 +707,11 @@ export default function ApontamentoPage() {
                                                                     {entry.projeto ? (
                                                                         <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
                                                                             Projeto: {entry.projeto}
+                                                                        </span>
+                                                                    ) : null}
+                                                                    {entry.papel ? (
+                                                                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                                                            Papel: {entry.papel}
                                                                         </span>
                                                                     ) : null}
                                                                     {entry.aprovado && (

@@ -20,15 +20,17 @@ export async function middleware(req: NextRequest) {
 
   const pathname = req.nextUrl.pathname;
 
-  if (
-    !user &&
-    !AUTH_PATHS.some((path) => pathname.startsWith(path)) &&
-    !PUBLIC_PATHS.some((path) => pathname.startsWith(path))
-  ) {
-    const redirectUrl = new URL("/signin", req.url);
-    redirectUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(redirectUrl);
-  }
+  /*
+    if (
+      !user &&
+      !AUTH_PATHS.some((path) => pathname.startsWith(path)) &&
+      !PUBLIC_PATHS.some((path) => pathname.startsWith(path))
+    ) {
+      const redirectUrl = new URL("/signin", req.url);
+      redirectUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
+  */
 
   if (user && pathname === "/signin") {
     return NextResponse.redirect(new URL("/dashboard", req.url));
