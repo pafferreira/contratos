@@ -1,32 +1,34 @@
 "use client";
 
-import { SessionContextProvider } from "@supabase/auth-helpers-react";
-import { type Session } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useMemo } from "react";
+import { createContext, useContext, useMemo } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/types";
 
-export function SupabaseProvider({
-  children,
-  initialSession
-}: {
-  children: React.ReactNode;
-  initialSession: Session | null;
-}) {
-  const supabaseClient = useMemo(() => createSupabaseBrowserClient(), []);
+type SupabaseContext = {
+  supabase: SupabaseClient<Database>;
+};
 
-  if (!supabaseClient) {
-    if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.warn(
-        "Supabase não inicializado. Verifique NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
-      );
-    }
+const Context = createContext<SupabaseContext | undefined>(undefined);
+
+export function SupabaseProvider({ children }: { children: React.ReactNode; initialSession?: any }) {
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+
+  if (!supabase) {
     return <>{children}</>;
   }
 
   return (
-    <SessionContextProvider supabaseClient={supabaseClient} initialSession={initialSession}>
+    <Context.Provider value={{ supabase }}>
       {children}
-    </SessionContextProvider>
+    </Context.Provider>
   );
 }
+
+export const useSupabase = () => {
+  const context = useContext(Context);
+  if (context === undefined) {
+    throw new Error("useSupabase must be used inside SupabaseProvider");
+  }
+  return context;
+};

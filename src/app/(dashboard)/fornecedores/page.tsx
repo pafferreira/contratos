@@ -1283,7 +1283,7 @@ export default function ContratosFornecedorPage() {
                         className={clsx(
                           "rounded-full px-2 py-0.5 text-xs font-medium",
                           statusStyles[contract.status ?? "rascunho"] ??
-                            "bg-neutral-100 text-neutral-600"
+                          "bg-neutral-100 text-neutral-600"
                         )}
                       >
                         {statusLabel}
@@ -2055,7 +2055,7 @@ export default function ContratosFornecedorPage() {
                     </option>
                     {profiles.map((profile) => (
                       <option key={profile.id} value={profile.id}>
-                        {profile.nome}
+                        {profile.nome} - {formatCurrency(profile.valor_hora)}
                       </option>
                     ))}
                   </select>

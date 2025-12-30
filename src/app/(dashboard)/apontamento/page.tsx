@@ -153,6 +153,22 @@ function formatHoursDisplay(hours?: number | null) {
     return formatMinutesToHours(totalMinutes);
 }
 
+function formatOSLabel(numeroOs: string | null, perfil: { nome: string | null } | { nome: string | null }[] | null | undefined) {
+    if (!numeroOs) return "";
+
+    // Limpa o número da OS (remove ::profile::UUID se existir)
+    let rawOs = numeroOs;
+    if (rawOs.includes("::profile::")) {
+        rawOs = rawOs.split("::profile::")[0];
+    }
+
+    // Pega o nome do perfil
+    const perfilObj = Array.isArray(perfil) ? perfil[0] : perfil;
+    const perfilNome = perfilObj?.nome;
+
+    return rawOs + (perfilNome ? ` - ${perfilNome}` : "");
+}
+
 function inputClassName(hasError?: boolean) {
     return clsx(
         "w-full rounded-lg border px-3 py-2 text-sm text-neutral-900 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-200 focus-visible:ring-offset-1",
@@ -258,6 +274,7 @@ export default function ApontamentoPage() {
                 .select(`
                     id,
                     numero_os,
+                    perfil_solicitado:C_PERFIS_RECURSOS ( nome ),
                     contrato:C_CONTRATOS_FORNECEDOR!inner (
                         fornecedor_id
                     )
@@ -295,19 +312,8 @@ export default function ApontamentoPage() {
                             // Formata o título do projeto com RS e OS
                             const rsTitulo = solicitacao?.titulo || "Sem título";
 
-                            // Limpa o número da OS (remove ::profile::UUID se existir)
-                            let rawOs = ordemServico?.numero_os || "";
-                            if (rawOs.includes("::profile::")) {
-                                rawOs = rawOs.split("::profile::")[0];
-                            }
-
-                            // Pega o nome do perfil solicitado na OS
-                            const perfilSol = Array.isArray(ordemServico?.perfil_solicitado)
-                                ? ordemServico.perfil_solicitado[0]
-                                : ordemServico?.perfil_solicitado;
-                            const perfilNome = perfilSol?.nome;
-
-                            const osNumero = rawOs ? `(OS: ${rawOs}${perfilNome ? ` - ${perfilNome}` : ""})` : "";
+                            const osLabel = formatOSLabel(ordemServico?.numero_os, ordemServico?.perfil_solicitado);
+                            const osNumero = osLabel ? `(OS: ${osLabel})` : "";
                             const projetoLabel = `${rsTitulo} ${osNumero}`.trim();
 
                             allEntries.push({
@@ -856,7 +862,7 @@ export default function ApontamentoPage() {
                                         </option>
                                         {getSupplierOSs().map((os: any) => (
                                             <option key={os.id} value={os.id}>
-                                                {os.numero_os}
+                                                {formatOSLabel(os.numero_os, os.perfil_solicitado)}
                                             </option>
                                         ))}
                                     </select>

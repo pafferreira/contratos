@@ -1,0 +1,4 @@
+# Regras do Projeto
+
+- **Testes de Navegador**: Não realize testes automáticos no navegador (`browser_subagent` ou ferramentas similares) a menos que seja explicitamente solicitado pelo usuário.
+- **Comunicação**: Responda sempre em Português (Brasil), a menos que solicitado de outra forma.

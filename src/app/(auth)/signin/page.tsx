@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { Route } from "next";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ export default function SignInPage() {
       setLoading(false);
       return;
     }
-    router.push(redirectTo);
+    router.push(redirectTo as Route);
   }
 
   return (

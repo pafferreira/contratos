@@ -334,10 +334,10 @@ export default function RecursosPage() {
           resource.perfil ??
           (fallbackProfile
             ? {
-                id: fallbackProfile.id,
-                nome: fallbackProfile.nome,
-                valor_hora: fallbackProfile.valor_hora
-              }
+              id: fallbackProfile.id,
+              nome: fallbackProfile.nome,
+              valor_hora: fallbackProfile.valor_hora
+            }
             : null)
       };
     });
@@ -816,23 +816,23 @@ export default function RecursosPage() {
             </Card>
           ) : viewMode === "cards" ? (
             <div className="grid gap-4 xl:grid-cols-2">
-          {filteredResources.map((resource) => {
-            const isActive = resource.ativo !== false;
-            const supplierName =
-              resource.fornecedor?.nome ??
-              suppliersMap.get(resource.fornecedor_id ?? "")?.nome ??
-              "Fornecedor não informado";
-            const profileName =
-              resource.perfil?.nome ??
-              profilesMap.get(resource.perfil_id ?? "")?.nome ??
-              "Perfil não informado";
-            const profileRate =
-              resource.perfil?.valor_hora ??
-              profilesMap.get(resource.perfil_id ?? "")?.valor_hora ??
-              null;
-            return (
-              <Card key={resource.id} className="space-y-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              {filteredResources.map((resource) => {
+                const isActive = resource.ativo !== false;
+                const supplierName =
+                  resource.fornecedor?.nome ??
+                  suppliersMap.get(resource.fornecedor_id ?? "")?.nome ??
+                  "Fornecedor não informado";
+                const profileName =
+                  resource.perfil?.nome ??
+                  profilesMap.get(resource.perfil_id ?? "")?.nome ??
+                  "Perfil não informado";
+                const profileRate =
+                  resource.perfil?.valor_hora ??
+                  profilesMap.get(resource.perfil_id ?? "")?.valor_hora ??
+                  null;
+                return (
+                  <Card key={resource.id} className="space-y-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
                         <p className="text-xs uppercase tracking-wide text-neutral-400">Recurso</p>
                         <div className="flex items-center gap-2">
@@ -906,21 +906,21 @@ export default function RecursosPage() {
                       </Tooltip.Provider>
                     </div>
 
-                <div className="grid gap-3 text-sm text-neutral-600 md:grid-cols-2">
-                  <div>
-                    <p className="text-neutral-500">Fornecedor</p>
-                    <p className="font-medium text-neutral-900">{supplierName}</p>
-                  </div>
-                  <div>
-                    <p className="text-neutral-500">Perfil</p>
-                    <p className="font-medium text-neutral-900">{profileName}</p>
-                    {profileRate ? (
-                      <p className="text-xs text-neutral-500">
-                        Valor hora: {formatCurrency(profileRate)}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
+                    <div className="grid gap-3 text-sm text-neutral-600 md:grid-cols-2">
+                      <div>
+                        <p className="text-neutral-500">Fornecedor</p>
+                        <p className="font-medium text-neutral-900">{supplierName}</p>
+                      </div>
+                      <div>
+                        <p className="text-neutral-500">Perfil</p>
+                        <p className="font-medium text-neutral-900">{profileName}</p>
+                        {profileRate ? (
+                          <p className="text-xs text-neutral-500">
+                            Valor hora: {formatCurrency(profileRate)}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
                   </Card>
                 );
               })}
@@ -1052,184 +1052,184 @@ export default function RecursosPage() {
             <Dialog.Portal>
               <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
               <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl focus:outline-none">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <Dialog.Title className="text-lg font-semibold text-neutral-900">
-                    {isCreateMode ? "Novo recurso" : "Editar recurso"}
-                  </Dialog.Title>
-                  <Dialog.Description className="text-sm text-neutral-500">
-                    Preencha os dados e clique em salvar. Pressione ESC ou clique fora para fechar.
-                  </Dialog.Description>
-                </div>
-                <Dialog.Close asChild>
-                  <button
-                    className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
-                    aria-label="Fechar"
-                    type="button"
-                    onClick={resetForm}
-                  >
-                    <X className="size-4" />
-                  </button>
-                </Dialog.Close>
-              </div>
-
-              {formErrors.general ? (
-                <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
-                  {formErrors.general}
-                </div>
-              ) : null}
-
-              <form className="space-y-4" onSubmit={handleSubmit}>
-                <div>
-                  <label className="text-sm font-medium text-neutral-700">Nome completo</label>
-                  <input
-                    type="text"
-                    name="nome_completo"
-                    value={formState.nome_completo}
-                    onChange={handleInputChange}
-                    className={clsx(inputClassName(Boolean(formErrors.nome_completo)), "mt-2")}
-                  />
-                  {formErrors.nome_completo ? (
-                    <p className="mt-1 text-xs text-danger">{formErrors.nome_completo}</p>
-                  ) : null}
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-neutral-700">E-mail corporativo</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formState.email}
-                    onChange={handleInputChange}
-                    placeholder="nome.sobrenome@empresa.com"
-                    className={clsx(inputClassName(Boolean(formErrors.email)), "mt-2")}
-                  />
-                  {formErrors.email ? (
-                    <p className="mt-1 text-xs text-danger">{formErrors.email}</p>
-                  ) : (
-                    <p className="mt-1 text-xs text-neutral-500">Campo opcional</p>
-                  )}
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="mb-4 flex items-center justify-between">
                   <div>
-                    <label className="text-sm font-medium text-neutral-700">Fornecedor</label>
-                    <select
-                      name="fornecedor_id"
-                      value={formState.fornecedor_id}
-                      onChange={handleInputChange}
-                      className={clsx(inputClassName(Boolean(formErrors.fornecedor_id)), "mt-2 bg-white")}
-                      disabled={supplierSelectDisabled}
-                    >
-                      <option value="">
-                        {supplierSelectDisabled
-                          ? "Cadastre fornecedores primeiro"
-                          : "Selecione o fornecedor"}
-                      </option>
-                      {suppliers.map((supplier) => (
-                        <option key={supplier.id} value={supplier.id}>
-                          {supplier.nome}
-                        </option>
-                      ))}
-                    </select>
-                    {formErrors.fornecedor_id ? (
-                      <p className="mt-1 text-xs text-danger">{formErrors.fornecedor_id}</p>
-                    ) : null}
+                    <Dialog.Title className="text-lg font-semibold text-neutral-900">
+                      {isCreateMode ? "Novo recurso" : "Editar recurso"}
+                    </Dialog.Title>
+                    <Dialog.Description className="text-sm text-neutral-500">
+                      Preencha os dados e clique em salvar. Pressione ESC ou clique fora para fechar.
+                    </Dialog.Description>
                   </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-neutral-700">Perfil</label>
-                    <select
-                      name="perfil_id"
-                      value={formState.perfil_id}
-                      onChange={handleInputChange}
-                      className={clsx(inputClassName(Boolean(formErrors.perfil_id)), "mt-2 bg-white")}
-                      disabled={profileSelectDisabled}
-                    >
-                      <option value="">
-                        {profileSelectDisabled
-                          ? "Cadastre perfis primeiro"
-                          : "Selecione o perfil"}
-                      </option>
-                      {profiles.map((profile) => (
-                        <option key={profile.id} value={profile.id}>
-                          {profile.nome}
-                        </option>
-                      ))}
-                    </select>
-                    {formErrors.perfil_id ? (
-                      <p className="mt-1 text-xs text-danger">{formErrors.perfil_id}</p>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-neutral-700">Status</label>
-                  <select
-                    name="ativo"
-                    value={formState.ativo}
-                    onChange={handleInputChange}
-                    className={clsx(inputClassName(Boolean(formErrors.ativo)), "mt-2 bg-white")}
-                  >
-                    <option value="true">Ativo</option>
-                    <option value="false">Inativo</option>
-                  </select>
-                  {formErrors.ativo ? (
-                    <p className="mt-1 text-xs text-danger">{formErrors.ativo}</p>
-                  ) : null}
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-2">
                   <Dialog.Close asChild>
-                    <Button type="button" variant="outline" onClick={resetForm}>
+                    <button
+                      className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
+                      aria-label="Fechar"
+                      type="button"
+                      onClick={resetForm}
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </Dialog.Close>
+                </div>
+
+                {formErrors.general ? (
+                  <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
+                    {formErrors.general}
+                  </div>
+                ) : null}
+
+                <form className="space-y-4" onSubmit={handleSubmit}>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-700">Nome completo</label>
+                    <input
+                      type="text"
+                      name="nome_completo"
+                      value={formState.nome_completo}
+                      onChange={handleInputChange}
+                      className={clsx(inputClassName(Boolean(formErrors.nome_completo)), "mt-2")}
+                    />
+                    {formErrors.nome_completo ? (
+                      <p className="mt-1 text-xs text-danger">{formErrors.nome_completo}</p>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-neutral-700">E-mail corporativo</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formState.email}
+                      onChange={handleInputChange}
+                      placeholder="nome.sobrenome@empresa.com"
+                      className={clsx(inputClassName(Boolean(formErrors.email)), "mt-2")}
+                    />
+                    {formErrors.email ? (
+                      <p className="mt-1 text-xs text-danger">{formErrors.email}</p>
+                    ) : (
+                      <p className="mt-1 text-xs text-neutral-500">Campo opcional</p>
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="text-sm font-medium text-neutral-700">Fornecedor</label>
+                      <select
+                        name="fornecedor_id"
+                        value={formState.fornecedor_id}
+                        onChange={handleInputChange}
+                        className={clsx(inputClassName(Boolean(formErrors.fornecedor_id)), "mt-2 bg-white")}
+                        disabled={supplierSelectDisabled}
+                      >
+                        <option value="">
+                          {supplierSelectDisabled
+                            ? "Cadastre fornecedores primeiro"
+                            : "Selecione o fornecedor"}
+                        </option>
+                        {suppliers.map((supplier) => (
+                          <option key={supplier.id} value={supplier.id}>
+                            {supplier.nome}
+                          </option>
+                        ))}
+                      </select>
+                      {formErrors.fornecedor_id ? (
+                        <p className="mt-1 text-xs text-danger">{formErrors.fornecedor_id}</p>
+                      ) : null}
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-neutral-700">Perfil</label>
+                      <select
+                        name="perfil_id"
+                        value={formState.perfil_id}
+                        onChange={handleInputChange}
+                        className={clsx(inputClassName(Boolean(formErrors.perfil_id)), "mt-2 bg-white")}
+                        disabled={profileSelectDisabled}
+                      >
+                        <option value="">
+                          {profileSelectDisabled
+                            ? "Cadastre perfis primeiro"
+                            : "Selecione o perfil"}
+                        </option>
+                        {profiles.map((profile) => (
+                          <option key={profile.id} value={profile.id}>
+                            {profile.nome} - {formatCurrency(profile.valor_hora)}
+                          </option>
+                        ))}
+                      </select>
+                      {formErrors.perfil_id ? (
+                        <p className="mt-1 text-xs text-danger">{formErrors.perfil_id}</p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-neutral-700">Status</label>
+                    <select
+                      name="ativo"
+                      value={formState.ativo}
+                      onChange={handleInputChange}
+                      className={clsx(inputClassName(Boolean(formErrors.ativo)), "mt-2 bg-white")}
+                    >
+                      <option value="true">Ativo</option>
+                      <option value="false">Inativo</option>
+                    </select>
+                    {formErrors.ativo ? (
+                      <p className="mt-1 text-xs text-danger">{formErrors.ativo}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <Dialog.Close asChild>
+                      <Button type="button" variant="outline" onClick={resetForm}>
+                        Cancelar
+                      </Button>
+                    </Dialog.Close>
+                    <Button type="submit" disabled={submitDisabled}>
+                      {submitting ? "Salvando..." : isCreateMode ? "Criar recurso" : "Atualizar recurso"}
+                    </Button>
+                  </div>
+                </form>
+              </Dialog.Content>
+            </Dialog.Portal>
+          </Dialog.Root>
+
+          <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
+            <Dialog.Portal>
+              <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
+              <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl focus:outline-none">
+                <Dialog.Title className="text-lg font-semibold text-neutral-900">
+                  Confirmar exclusão
+                </Dialog.Title>
+                <Dialog.Description className="mt-2 text-sm text-neutral-600">
+                  Tem certeza que deseja excluir o recurso {pendingResource?.nome_completo}? Essa ação
+                  não pode ser desfeita.
+                </Dialog.Description>
+
+                {deleteError ? (
+                  <div className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
+                    {deleteError}
+                  </div>
+                ) : null}
+
+                <div className="mt-6 flex justify-end gap-3">
+                  <Dialog.Close asChild>
+                    <Button variant="outline" type="button" onClick={() => setPendingResource(null)}>
                       Cancelar
                     </Button>
                   </Dialog.Close>
-                  <Button type="submit" disabled={submitDisabled}>
-                    {submitting ? "Salvando..." : isCreateMode ? "Criar recurso" : "Atualizar recurso"}
+                  <Button
+                    variant="destructive"
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={deleteLoading}
+                  >
+                    {deleteLoading ? "Excluindo..." : "Excluir"}
                   </Button>
                 </div>
-              </form>
-            </Dialog.Content>
-          </Dialog.Portal>
-        </Dialog.Root>
-
-      <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl focus:outline-none">
-            <Dialog.Title className="text-lg font-semibold text-neutral-900">
-              Confirmar exclusão
-            </Dialog.Title>
-            <Dialog.Description className="mt-2 text-sm text-neutral-600">
-              Tem certeza que deseja excluir o recurso {pendingResource?.nome_completo}? Essa ação
-              não pode ser desfeita.
-            </Dialog.Description>
-
-              {deleteError ? (
-                <div className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
-                  {deleteError}
-                </div>
-              ) : null}
-
-              <div className="mt-6 flex justify-end gap-3">
-                <Dialog.Close asChild>
-                  <Button variant="outline" type="button" onClick={() => setPendingResource(null)}>
-                    Cancelar
-                  </Button>
-                </Dialog.Close>
-                <Button
-                  variant="destructive"
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={deleteLoading}
-                >
-                  {deleteLoading ? "Excluindo..." : "Excluir"}
-                </Button>
-              </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+              </Dialog.Content>
+            </Dialog.Portal>
+          </Dialog.Root>
         </>
       ) : (
         <>
@@ -1375,92 +1375,92 @@ export default function RecursosPage() {
                     <Dialog.Title className="text-lg font-semibold text-neutral-900">
                       {profileIsCreateMode ? "Novo perfil" : "Editar perfil"}
                     </Dialog.Title>
-                      <Dialog.Description className="text-sm text-neutral-500">
-                        Cadastre perfis com descrição e valor hora padrão.
-                      </Dialog.Description>
-                    </div>
-                    <Dialog.Close asChild>
-                      <button
-                        className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
-                        aria-label="Fechar"
-                        type="button"
-                        onClick={resetProfileForm}
-                      >
-                        <X className="size-4" />
-                      </button>
-                    </Dialog.Close>
+                    <Dialog.Description className="text-sm text-neutral-500">
+                      Cadastre perfis com descrição e valor hora padrão.
+                    </Dialog.Description>
+                  </div>
+                  <Dialog.Close asChild>
+                    <button
+                      className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
+                      aria-label="Fechar"
+                      type="button"
+                      onClick={resetProfileForm}
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </Dialog.Close>
+                </div>
+
+                {profileFormErrors.general ? (
+                  <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
+                    {profileFormErrors.general}
+                  </div>
+                ) : null}
+
+                <form className="space-y-4" onSubmit={handleProfileSubmit}>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-700">Nome do perfil</label>
+                    <input
+                      type="text"
+                      name="nome"
+                      value={profileFormState.nome}
+                      onChange={handleProfileInputChange}
+                      className={clsx(inputClassName(Boolean(profileFormErrors.nome)), "mt-2")}
+                    />
+                    {profileFormErrors.nome ? (
+                      <p className="mt-1 text-xs text-danger">{profileFormErrors.nome}</p>
+                    ) : null}
                   </div>
 
-                  {profileFormErrors.general ? (
-                    <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
-                      {profileFormErrors.general}
-                    </div>
-                  ) : null}
+                  <div>
+                    <label className="text-sm font-medium text-neutral-700">Descrição</label>
+                    <textarea
+                      name="descricao"
+                      value={profileFormState.descricao}
+                      onChange={handleProfileInputChange}
+                      rows={3}
+                      className={clsx(
+                        inputClassName(Boolean(profileFormErrors.descricao)),
+                        "mt-2 resize-none"
+                      )}
+                      placeholder="Principais atribuições, senioridade, etc."
+                    />
+                    <p className="mt-1 text-xs text-neutral-500">Campo opcional</p>
+                  </div>
 
-                  <form className="space-y-4" onSubmit={handleProfileSubmit}>
-                    <div>
-                      <label className="text-sm font-medium text-neutral-700">Nome do perfil</label>
-                      <input
-                        type="text"
-                        name="nome"
-                        value={profileFormState.nome}
-                        onChange={handleProfileInputChange}
-                        className={clsx(inputClassName(Boolean(profileFormErrors.nome)), "mt-2")}
-                      />
-                      {profileFormErrors.nome ? (
-                        <p className="mt-1 text-xs text-danger">{profileFormErrors.nome}</p>
-                      ) : null}
-                    </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-700">Valor hora (R$)</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      name="valor_hora_display"
+                      value={profileFormState.valor_hora_display}
+                      onChange={handleProfileCurrencyChange}
+                      className={clsx(inputClassName(Boolean(profileFormErrors.valor_hora)), "mt-2")}
+                    />
+                    {profileFormErrors.valor_hora ? (
+                      <p className="mt-1 text-xs text-danger">{profileFormErrors.valor_hora}</p>
+                    ) : null}
+                  </div>
 
-                    <div>
-                      <label className="text-sm font-medium text-neutral-700">Descrição</label>
-                      <textarea
-                        name="descricao"
-                        value={profileFormState.descricao}
-                        onChange={handleProfileInputChange}
-                        rows={3}
-                        className={clsx(
-                          inputClassName(Boolean(profileFormErrors.descricao)),
-                          "mt-2 resize-none"
-                        )}
-                        placeholder="Principais atribuições, senioridade, etc."
-                      />
-                      <p className="mt-1 text-xs text-neutral-500">Campo opcional</p>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium text-neutral-700">Valor hora (R$)</label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        name="valor_hora_display"
-                        value={profileFormState.valor_hora_display}
-                        onChange={handleProfileCurrencyChange}
-                        className={clsx(inputClassName(Boolean(profileFormErrors.valor_hora)), "mt-2")}
-                      />
-                      {profileFormErrors.valor_hora ? (
-                        <p className="mt-1 text-xs text-danger">{profileFormErrors.valor_hora}</p>
-                      ) : null}
-                    </div>
-
-                    <div className="flex items-center justify-end gap-3 pt-2">
-                      <Dialog.Close asChild>
-                        <Button type="button" variant="outline" onClick={resetProfileForm}>
-                          Cancelar
-                        </Button>
-                      </Dialog.Close>
-                      <Button type="submit" disabled={profileSubmitDisabled}>
-                        {profileSubmitting
-                          ? "Salvando..."
-                          : profileIsCreateMode
-                            ? "Criar perfil"
-                            : "Atualizar perfil"}
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <Dialog.Close asChild>
+                      <Button type="button" variant="outline" onClick={resetProfileForm}>
+                        Cancelar
                       </Button>
-                    </div>
-                  </form>
-                </Dialog.Content>
-              </Dialog.Portal>
-            </Dialog.Root>
+                    </Dialog.Close>
+                    <Button type="submit" disabled={profileSubmitDisabled}>
+                      {profileSubmitting
+                        ? "Salvando..."
+                        : profileIsCreateMode
+                          ? "Criar perfil"
+                          : "Atualizar perfil"}
+                    </Button>
+                  </div>
+                </form>
+              </Dialog.Content>
+            </Dialog.Portal>
+          </Dialog.Root>
 
           <Dialog.Root open={profileDeleteOpen} onOpenChange={setProfileDeleteOpen}>
             <Dialog.Portal>
