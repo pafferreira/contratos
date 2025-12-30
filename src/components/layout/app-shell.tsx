@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { PersonaSwitcher } from "@/components/navigation/persona-switcher";
 import { ThemeToggle } from "@/components/navigation/theme-toggle";
 import clsx from "clsx";
+import pkg from "../../../package.json";
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -85,6 +86,15 @@ export function AppShell({ children }: AppShellProps) {
             })}
           </nav>
         </Tooltip.Provider>
+
+        <div className={clsx("mt-auto border-t border-neutral-100 p-4", isCollapsed ? "px-2 py-4" : "p-4")}>
+          <div className={clsx("flex items-center gap-2 text-neutral-400", isCollapsed && "justify-center")}>
+            <div className="size-1.5 rounded-full bg-success/50" />
+            <span className="text-[10px] font-semibold uppercase tracking-wider">
+              {isCollapsed ? `v${pkg.version.split(".")[0]}` : `v${pkg.version}`}
+            </span>
+          </div>
+        </div>
       </aside>
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="sticky top-0 z-30 border-b border-neutral-100 bg-white/70 backdrop-blur">
