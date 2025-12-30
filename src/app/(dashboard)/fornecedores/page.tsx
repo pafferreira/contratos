@@ -25,6 +25,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useSupabase } from "@/components/providers/supabase-provider";
 
 import { type Database, type TablesRow } from "@/lib/supabase/types";
 
@@ -397,7 +398,7 @@ function extractBaseOsNumber(numeroOs?: string | null) {
 
 export default function ContratosFornecedorPage() {
 
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const { supabase } = useSupabase();
 
   const [contracts, setContracts] = useState<SupplierContractRecord[]>([]);
 

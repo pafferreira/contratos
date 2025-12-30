@@ -27,6 +27,7 @@ import {
     TooltipTrigger
 } from "@/components/ui/tooltip";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useSupabase } from "@/components/providers/supabase-provider";
 import { type Database, type TablesRow } from "@/lib/supabase/types";
 
 type ResourceRow = TablesRow<Database["public"]["Tables"]["C_RECURSOS_FORNECEDOR"]>;
@@ -179,7 +180,7 @@ function inputClassName(hasError?: boolean) {
 }
 
 export default function ApontamentoPage() {
-    const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+    const { supabase } = useSupabase();
 
     const [resources, setResources] = useState<ResourceWithEntries[]>([]);
     const [availableOSs, setAvailableOSs] = useState<any[]>([]);

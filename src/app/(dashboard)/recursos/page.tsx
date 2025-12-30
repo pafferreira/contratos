@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useSupabase } from "@/components/providers/supabase-provider";
 import { type Database, type TablesRow } from "@/lib/supabase/types";
 
 type ResourceRow = TablesRow<Database["public"]["Tables"]["C_RECURSOS_FORNECEDOR"]>;
@@ -158,7 +159,7 @@ function viewToggleClassName(isActive: boolean) {
 }
 
 export default function RecursosPage() {
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const { supabase } = useSupabase();
 
   const [resources, setResources] = useState<ResourceRecord[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);

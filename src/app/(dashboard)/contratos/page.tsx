@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useSupabase } from "@/components/providers/supabase-provider";
 import { type Database, type TablesRow } from "@/lib/supabase/types";
 
 type ContractRow = TablesRow<Database["public"]["Tables"]["C_CONTRATOS_CLIENTE"]>;
@@ -186,7 +187,7 @@ function normalizeCurrencyInput(value: string) {
 }
 
 export default function ContratosPage() {
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const { supabase } = useSupabase();
   const [contracts, setContracts] = useState<ContractRecord[]>([]);
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [loading, setLoading] = useState(true);

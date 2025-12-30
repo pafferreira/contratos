@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useSupabase } from "@/components/providers/supabase-provider";
 
 type RSRow = {
   id: string;
@@ -106,7 +107,7 @@ const calcTotal = (form: ProjectFormState) => {
 };
 
 export default function ProjetosPage() {
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const { supabase } = useSupabase();
   const [rsList, setRsList] = useState<RSRecord[]>([]);
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);

@@ -30,10 +30,10 @@ export default async function SystemsPage() {
     );
   }
 
-  const { data: userRoles, error: userRolesError } = await supabaseClient
+  const { data: userRoles, error: userRolesError } = await (supabaseClient
     .from("z_usuarios_papeis")
     .select("papel_id, z_papeis ( id, nome, sistema_id )")
-    .eq("usuario_id", user.id);
+    .eq("usuario_id", user.id) as any);
 
   if (userRolesError) {
     return (
@@ -50,7 +50,7 @@ export default async function SystemsPage() {
 
   const systemProfiles = new Map<string, string[]>();
 
-  (userRoles ?? []).forEach((entry) => {
+  (userRoles ?? []).forEach((entry: any) => {
     const role = entry.z_papeis as { sistema_id: string | null; nome: string | null } | null;
     if (!role?.sistema_id) {
       return;
@@ -97,7 +97,7 @@ export default async function SystemsPage() {
     );
   }
 
-  const systemsWithProfile = systems
+  const systemsWithProfile = (systems as any[])
     .map((system) => {
       const profile = systemProfiles.get(system.id) ?? [];
       return { ...system, profile: profile.join(", ") };

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import clsx from "clsx";
 import { ChevronDown, Plus, Pencil, Trash2, X } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useSupabase } from "@/components/providers/supabase-provider";
 
 type RSStatus = "planejada" | "em_execucao" | "homologacao" | "encerrada";
 
@@ -103,7 +104,7 @@ const normalizeCurrencyInput = (value: string) => {
 };
 
 export default function RSPage() {
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const { supabase } = useSupabase();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [espData, setEspData] = useState<ESP[]>([]);

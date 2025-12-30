@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useSupabase } from "@/components/providers/supabase-provider";
 import { Database } from "@/lib/supabase/types";
 import {
     Loader2,
@@ -31,7 +32,7 @@ type ZRole = Database["public"]["Tables"]["z_papeis"]["Row"];
 type ZUserRole = Database["public"]["Tables"]["z_usuarios_papeis"]["Row"];
 
 export function AccessControlClient() {
-    const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+    const { supabase } = useSupabase();
     const [activeTab, setActiveTab] = useState("users");
 
     // Data State
