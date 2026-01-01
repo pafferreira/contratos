@@ -1,1 +1,0 @@
-ALTER TABLE public."C_REQUISICOES_SERVICO" ADD COLUMN IF NOT EXISTS valor_total numeric(14,2);

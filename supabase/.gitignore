@@ -1,0 +1,18 @@
+# Arquivos temporários
+*.tmp
+*.bak
+*.backup
+
+# Arquivos de backup do banco
+*.sql.backup
+backup_*.sql
+
+# Logs
+*.log
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Arquivos antigos (mover para pasta archive/)
+archive/
