@@ -1366,7 +1366,7 @@ export default function ContratosFornecedorPage() {
                     <div>
                       <p className="text-sm font-medium text-neutral-900">Ordens de Serviço</p>
                       <p className="text-xs text-neutral-500">
-                        Gerencie OSs vinculadas a este contrato.
+                        Gerencie as OSs vinculadas a este contrato.
                       </p>
                     </div>
                     <Button
@@ -1393,7 +1393,7 @@ export default function ContratosFornecedorPage() {
                       <table className="min-w-full divide-y divide-neutral-100 text-sm">
                         <thead className="bg-neutral-50 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
                           <tr>
-                            <th className="px-3 py-2">Número</th>
+                            <th className="px-3 py-2">Nº OS</th>
                             <th className="px-3 py-2">Perfil</th>
                             <th className="px-3 py-2">Quantidade</th>
                             <th className="px-3 py-2">Horas</th>

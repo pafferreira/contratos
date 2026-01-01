@@ -4,13 +4,16 @@ import { redirect } from "next/navigation";
 
 export default async function AccessControlPage() {
     const supabase = createSupabaseServerClient();
+    if (!supabase) {
+        redirect("/signin");
+    }
 
     const {
         data: { user },
-    } = await supabase.auth.getUser();
+    } = (await supabase.auth.getUser()) ?? { data: { user: null } };
 
     if (!user) {
-        redirect("/login");
+        redirect("/signin");
     }
 
     return <AccessControlClient />;

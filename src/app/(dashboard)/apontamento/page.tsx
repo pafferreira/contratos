@@ -265,7 +265,8 @@ export default function ApontamentoPage() {
                         )
                     )
                 `)
-                .eq("ativo", true);
+                .eq("ativo", true)
+                .order("nome_completo");
 
             if (resourcesError) throw resourcesError;
 
