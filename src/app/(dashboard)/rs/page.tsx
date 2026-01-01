@@ -191,7 +191,7 @@ export default function RSPage() {
     setLoading(true);
     setError(null);
 
-    const { data, error: fetchError } = await (supabase as any)
+    const { data, error: fetchError } = await supabase
       .from("C_ESPECIFICACOES_SERVICO")
       .select(
         `
@@ -367,7 +367,7 @@ export default function RSPage() {
       valor_total: espForm.valor_total ? Number(espForm.valor_total) : null,
       valor_comprometido: espForm.valor_comprometido ? Number(espForm.valor_comprometido) : null
     };
-    const query = supabase.from("C_ESPECIFICACOES_SERVICO");
+    const query = supabase.from("C_ESPECIFICACOES_SERVICO") as any;
     const response =
       espDialogMode === "edit" && espForm.id
         ? await query.update(payload).eq("id", espForm.id)
@@ -409,7 +409,7 @@ export default function RSPage() {
       responsavel_bu: rsForm.responsavel_bu || null,
       valor_total: rsForm.valor_total ? Number(rsForm.valor_total) : null
     };
-    const query = supabase.from("C_REQUISICOES_SERVICO");
+    const query = supabase.from("C_REQUISICOES_SERVICO") as any;
     const response =
       rsDialogMode === "edit" && rsForm.id
         ? await query.update(payload).eq("id", rsForm.id)

@@ -478,7 +478,7 @@ export default function ApontamentoPage() {
                 query = query.is("solicitacao_id", null);
             }
 
-            const { data: existingAlloc, error: findError } = await query.maybeSingle();
+            const { data: existingAlloc, error: findError } = await (query as any).maybeSingle();
 
             if (findError) throw findError;
 
@@ -486,8 +486,8 @@ export default function ApontamentoPage() {
 
             if (!finalAllocationId) {
                 // Criar nova alocação
-                const { data: newAlloc, error: createError } = await supabase
-                    .from("C_ALOCACOES_RECURSOS")
+                const { data: newAlloc, error: createError } = await (supabase
+                    .from("C_ALOCACOES_RECURSOS") as any)
                     .insert({
                         recurso_fornecedor_id: formState.recurso_id,
                         ordem_servico_id: formState.os_id,
@@ -512,8 +512,8 @@ export default function ApontamentoPage() {
             }
 
             if (formMode === "create") {
-                const { error: insertError } = await supabase
-                    .from("C_APONTAMENTOS_TEMPO")
+                const { error: insertError } = await (supabase
+                    .from("C_APONTAMENTOS_TEMPO") as any)
                     .insert({
                         alocacao_id: finalAllocationId,
                         data_trabalho: formState.data,
@@ -527,8 +527,8 @@ export default function ApontamentoPage() {
             } else if (formMode === "edit" && activeEntryId) {
                 // Nota: Se mudou a alocação (OS/Projeto), o update deve atualizar o alocacao_id também?
                 // Sim, se o usuário mudou OS/Projeto, o apontamento deve apontar para a nova alocação.
-                const { error: updateError } = await supabase
-                    .from("C_APONTAMENTOS_TEMPO")
+                const { error: updateError } = await (supabase
+                    .from("C_APONTAMENTOS_TEMPO") as any)
                     .update({
                         alocacao_id: finalAllocationId, // Atualiza alocação caso tenha mudado
                         data_trabalho: formState.data,
@@ -558,8 +558,8 @@ export default function ApontamentoPage() {
         try {
             if (!supabase) return;
 
-            const { error: updateError } = await supabase
-                .from("C_APONTAMENTOS_TEMPO")
+            const { error: updateError } = await (supabase
+                .from("C_APONTAMENTOS_TEMPO") as any)
                 .update({ aprovado: true })
                 .eq("id", entryId);
 

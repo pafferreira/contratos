@@ -30,10 +30,10 @@ export default async function SystemsPage() {
     );
   }
 
-  const { data: userRoles, error: userRolesError } = await (supabaseClient
+  const { data: userRoles, error: userRolesError } = await supabaseClient
     .from("z_usuarios_papeis")
     .select("papel_id, z_papeis ( id, nome, sistema_id )")
-    .eq("usuario_id", user.id) as any);
+    .eq("usuario_id", user.id);
 
   if (userRolesError) {
     return (
@@ -97,7 +97,7 @@ export default async function SystemsPage() {
     );
   }
 
-  const systemsWithProfile = (systems as any[])
+  const systemsWithProfile = (systems as Array<{ id: string; nome: string; descricao: string | null; ativo: boolean }>)
     .map((system) => {
       const profile = systemProfiles.get(system.id) ?? [];
       return { ...system, profile: profile.join(", ") };

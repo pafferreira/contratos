@@ -136,7 +136,7 @@ export default function ProjetosPage() {
 
   const loadProfiles = useCallback(async () => {
     if (!supabase) return;
-    const { data, error: fetchError } = await (supabase as any)
+    const { data, error: fetchError } = await supabase
       .from("C_PERFIS_RECURSOS")
       .select("id, nome, valor_hora")
       .order("nome", { ascending: true });
@@ -156,7 +156,7 @@ export default function ProjetosPage() {
     }
 
     setError(null);
-    const { data, error: fetchError } = await (supabase as any)
+    const { data, error: fetchError } = await supabase
       .from("C_REQUISICOES_SERVICO")
       .select(
         `
@@ -311,7 +311,7 @@ export default function ProjetosPage() {
 
     setPjSubmitting(true);
 
-    const query = (supabase as any).from("C_METRICAS_SOLICITACAO");
+    const query = supabase.from("C_METRICAS_SOLICITACAO") as any;
     const response =
       pjDialogMode === "edit" && activePjId
         ? await query.update(payload).eq("id", activePjId)
@@ -340,7 +340,7 @@ export default function ProjetosPage() {
     if (!confirmDeletePjId) return;
     if (!supabase) return;
     setDeletingPjId(confirmDeletePjId);
-    const { error: deleteErr } = await (supabase as any)
+    const { error: deleteErr } = await supabase
       .from("C_METRICAS_SOLICITACAO")
       .delete()
       .eq("id", confirmDeletePjId);

@@ -548,7 +548,7 @@ export default function RecursosPage() {
       return;
     }
 
-    const query = supabase.from(RESOURCES_TABLE);
+    const query = supabase.from(RESOURCES_TABLE) as any;
     const response =
       formMode === "edit" && activeResourceId
         ? await query.update(payload).eq("id", activeResourceId)
@@ -630,7 +630,7 @@ export default function RecursosPage() {
 
     setProfileSubmitting(true);
 
-    const query = supabase.from(PROFILES_TABLE);
+    const query = supabase.from(PROFILES_TABLE) as any;
     const response =
       profileFormMode === "edit" && activeProfileId
         ? await query.update(payload).eq("id", activeProfileId)

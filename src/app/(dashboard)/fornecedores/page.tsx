@@ -596,9 +596,9 @@ export default function ContratosFornecedorPage() {
 
       }
 
-      const mappedContracts = (data || []).map((contract) => ({
+      const mappedContracts = (data || []).map((contract: any) => ({
         ...contract,
-        osList: (contract as SupplierContractRecord)?.os ?? []
+        osList: contract?.os ?? []
       })) as SupplierContractRecord[];
 
       setContracts(mappedContracts);
@@ -841,7 +841,7 @@ export default function ContratosFornecedorPage() {
       return;
     }
 
-    const query = supabase.from(CONTRACTS_TABLE);
+    const query = supabase.from(CONTRACTS_TABLE) as any;
 
     const response = formMode === "edit" && activeContractId
 
@@ -1007,7 +1007,7 @@ export default function ContratosFornecedorPage() {
 
     setOsSubmitting(true);
 
-    const query = supabase.from(SERVICE_ORDERS_TABLE);
+    const query = supabase.from(SERVICE_ORDERS_TABLE) as any;
     const response =
       osDialogMode === "edit" && activeOsId
         ? await query.update(payload).eq("id", activeOsId)
@@ -1130,7 +1130,7 @@ export default function ContratosFornecedorPage() {
     };
 
     setSupplierSubmitting(true);
-    const query = supabase.from(SUPPLIERS_TABLE);
+    const query = supabase.from(SUPPLIERS_TABLE) as any;
     const response =
       supplierFormMode === "edit" && supplierFormState.id
         ? await query.update(payload).eq("id", supplierFormState.id)

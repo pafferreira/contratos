@@ -54,10 +54,10 @@ type ClientFormErrors = Partial<Record<keyof ClientFormState | "general", string
 
 const CONTRACTS_TABLE =
   (process.env.NEXT_PUBLIC_SUPABASE_CONTRACTS_TABLE ??
-    "C_CONTRATOS_CLIENTE") as keyof Database["public"]["Tables"];
+    "C_CONTRATOS_CLIENTE") as "C_CONTRATOS_CLIENTE";
 const CLIENTS_TABLE =
   (process.env.NEXT_PUBLIC_SUPABASE_CLIENTS_TABLE ??
-    "C_CLIENTES") as keyof Database["public"]["Tables"];
+    "C_CLIENTES") as "C_CLIENTES";
 
 const STATUS_OPTIONS = [
   { value: "rascunho", label: "Rascunho" },
@@ -500,9 +500,9 @@ export default function ContratosPage() {
 
     const mutation =
       formMode === "create"
-        ? supabase.from(CONTRACTS_TABLE).insert(supabasePayload)
-        : supabase
-          .from(CONTRACTS_TABLE)
+        ? (supabase.from(CONTRACTS_TABLE) as any).insert(supabasePayload)
+        : (supabase
+          .from(CONTRACTS_TABLE) as any)
           .update(supabasePayload)
           .eq("id", activeContractId ?? "");
 
@@ -552,7 +552,7 @@ export default function ContratosPage() {
     };
 
     setClientSubmitting(true);
-    const query = supabase.from(CLIENTS_TABLE);
+    const query = supabase.from(CLIENTS_TABLE) as any;
     const response =
       clientFormMode === "edit" && clientFormState.id
         ? await query.update(payload).eq("id", clientFormState.id)
