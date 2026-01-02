@@ -277,8 +277,8 @@ export default function AccessGeneralPage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-neutral-25">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-0 top-0 h-64 w-64 -translate-x-1/3 -translate-y-1/3 rounded-full bg-brand-100/80 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-72 w-72 translate-x-1/3 translate-y-1/3 rounded-full bg-brand-200/60 blur-3xl" />
+        <div className="absolute left-0 top-0 size-64 -translate-x-1/3 -translate-y-1/3 rounded-full bg-brand-100/80 blur-3xl" />
+        <div className="absolute bottom-0 right-0 size-72 translate-x-1/3 translate-y-1/3 rounded-full bg-brand-200/60 blur-3xl" />
       </div>
 
       <div className="relative mx-auto grid w-full max-w-6xl gap-8 px-6 py-12 lg:grid-cols-[1.1fr_0.9fr]">
@@ -292,7 +292,7 @@ export default function AccessGeneralPage() {
                 Controle de Acesso Geral
               </p>
               <h1 className="mt-2 text-3xl font-semibold text-neutral-900">
-                Portal seguro para todos os módulos
+                Portal seguro para todos os Sistemas
               </h1>
               <p className="mt-2 text-sm text-neutral-600">
                 Acesse sistemas com validação por senha, magic link ou Google. Perfis e permissões
@@ -367,7 +367,7 @@ export default function AccessGeneralPage() {
                       required
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
-                      className="w-full rounded-lg border border-neutral-200 bg-white py-2 pl-10 pr-10 text-sm text-neutral-800 shadow-sm outline-none transition hocus:border-brand-500"
+                      className="w-full rounded-lg border border-neutral-200 bg-white py-2 px-10 text-sm text-neutral-800 shadow-sm outline-none transition hocus:border-brand-500"
                       placeholder="Digite sua senha"
                     />
                     <button
@@ -510,7 +510,7 @@ export default function AccessGeneralPage() {
               <div>
                 <h2 className="text-lg font-semibold text-neutral-900">Módulos disponíveis</h2>
                 <p className="text-sm text-neutral-500">
-                  Acesso liberado com base nos papéis atribuídos ao usuário.
+                  Acesso baseado nos seus papéis atribuídos.
                 </p>
               </div>
               <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-600">

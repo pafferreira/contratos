@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, LayoutDashboard, LogOut, PanelRightOpen, PanelRightClose } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { DASHBOARD_NAV } from "@/lib/constants/navigation";
 import { Button } from "@/components/ui/button";
 import { PersonaSwitcher } from "@/components/navigation/persona-switcher";
 import { ThemeToggle } from "@/components/navigation/theme-toggle";
+import { useSupabase } from "@/components/providers/supabase-provider";
 import clsx from "clsx";
 import pkg from "../../../package.json";
 
@@ -17,10 +18,37 @@ type AppShellProps = {
 };
 
 export function AppShell({ children }: AppShellProps) {
+  const { supabase } = useSupabase();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const isCollapsed = useMemo(() => collapsed && !mobileOpen, [collapsed, mobileOpen]);
+  const [userLabel, setUserLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!mounted) return;
+      const email = data.user?.email ?? "";
+      if (!email) {
+        setUserLabel(null);
+        return;
+      }
+      const { data: profile } = await supabase
+        .from("z_usuarios")
+        .select("nome_completo")
+        .eq("email", email)
+        .maybeSingle();
+      const name = profile?.nome_completo || data.user?.user_metadata?.full_name || "Usuário";
+      setUserLabel(`${name} · ${email}`);
+    };
+
+    loadUser();
+    return () => {
+      mounted = false;
+    };
+  }, [supabase]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-neutral-25">
@@ -46,9 +74,7 @@ export function AppShell({ children }: AppShellProps) {
           <nav className="flex-1 space-y-1 overflow-y-auto px-3">
             {DASHBOARD_NAV.map((item) => {
               const active =
-                item.href === "/dashboard"
-                  ? pathname === "/dashboard"
-                  : pathname.startsWith(item.href);
+                pathname === item.href || pathname.startsWith(`${item.href}/`);
               const Icon = item.icon;
               return (
                 <Tooltip.Root key={item.href} delayDuration={50}>
@@ -99,7 +125,7 @@ export function AppShell({ children }: AppShellProps) {
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="sticky top-0 z-30 border-b border-neutral-100 bg-white/70 backdrop-blur">
           <div className="flex h-16 items-center justify-between px-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
                 size="icon"
@@ -119,6 +145,11 @@ export function AppShell({ children }: AppShellProps) {
                 {isCollapsed ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
               </Button>
               <PersonaSwitcher />
+              {userLabel ? (
+                <div className="hidden text-xs font-medium text-neutral-500 md:block">
+                  {userLabel}
+                </div>
+              ) : null}
             </div>
             <div className="flex items-center gap-2">
               <ThemeToggle />

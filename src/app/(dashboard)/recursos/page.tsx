@@ -182,7 +182,7 @@ export default function RecursosPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
-  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
+  const [viewMode, setViewMode] = useState<"cards" | "list">("list");
   const [activeTab, setActiveTab] = useState<"resources" | "profiles">("resources");
 
   const [profileLoading, setProfileLoading] = useState(false);

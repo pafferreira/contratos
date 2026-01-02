@@ -1,22 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import type { Database } from "@/lib/supabase/types";
 import {
+    LayoutGrid,
+    List,
     Loader2,
+    Lock,
+    Monitor,
+    Pencil,
     Plus,
     Search,
     Shield,
-    Monitor,
-    Users,
-    Lock,
-    MoreVertical,
     Trash2,
-    Pencil,
-    X,
-    Check
+    Users,
+    X
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
@@ -24,7 +23,6 @@ import { Button } from "@/components/ui/button";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { cn } from "@/lib/utils";
-import { LayoutGrid, List, AlertTriangle } from "lucide-react";
 
 type ZUser = Database["public"]["Tables"]["z_usuarios"]["Row"];
 type ZSystem = Database["public"]["Tables"]["z_sistemas"]["Row"];
@@ -87,7 +85,7 @@ export function AccessControlClient() {
                     </p>
                 </div>
                 <Button onClick={loadData} variant="outline" size="sm" className="gap-2">
-                    <Loader2 className={cn("h-4 w-4", loading && "animate-spin")} />
+                    <Loader2 className={cn("size-4", loading && "animate-spin")} />
                     Atualizar
                 </Button>
             </div>
@@ -110,7 +108,7 @@ export function AccessControlClient() {
                     </TabsTrigger>
                     <TabsTrigger value="roles" className="gap-2">
                         <Shield className="size-4" />
-                        Papeis
+                        Papéis
                     </TabsTrigger>
                 </TabsList>
 
@@ -154,7 +152,7 @@ export function AccessControlClient() {
 
 function UsersTab({ users, systems, roles, userRoles, onRefresh, supabase }: any) {
     const [search, setSearch] = useState("");
-    const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
+    const [viewMode, setViewMode] = useState<"cards" | "list">("list");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<ZUser | null>(null);
     const [formData, setFormData] = useState<Partial<ZUser>>({ nome_completo: "", email: "", ativo: true });
@@ -728,10 +726,32 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
     const [isRoleUsersOpen, setIsRoleUsersOpen] = useState(false);
     const [selectedRoleForUsers, setSelectedRoleForUsers] = useState<ZRole | null>(null);
 
-    const filteredRoles = roles.filter((r: ZRole) =>
-        r.nome.toLowerCase().includes(search.toLowerCase()) ||
-        r.descricao?.toLowerCase().includes(search.toLowerCase())
-    );
+    const getSystemName = (id: string) => systems.find((s: ZSystem) => s.id === id)?.nome || "Desconhecido";
+
+    const usersByRole = useMemo(() => {
+        const map = new Map<string, string[]>();
+        userRoles.forEach((ur: ZUserRole) => {
+            const user = users.find((u: ZUser) => u.id === ur.usuario_id);
+            if (!user) return;
+            const list = map.get(ur.papel_id) ?? [];
+            list.push(user.nome_completo || user.email);
+            map.set(ur.papel_id, list);
+        });
+        map.forEach((list, roleId) => {
+            map.set(roleId, Array.from(new Set(list)).sort((a, b) => a.localeCompare(b)));
+        });
+        return map;
+    }, [userRoles, users]);
+
+    const filteredRoles = roles.filter((r: ZRole) => {
+        const searchValue = search.toLowerCase();
+        const systemName = getSystemName(r.sistema_id || "").toLowerCase();
+        return (
+            r.nome.toLowerCase().includes(searchValue) ||
+            r.descricao?.toLowerCase().includes(searchValue) ||
+            systemName.includes(searchValue)
+        );
+    });
 
     const handleSave = async () => {
         setSaving(true);
@@ -770,7 +790,6 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
         }
     };
 
-    const getSystemName = (id: string) => systems.find((s: ZSystem) => s.id === id)?.nome || "Desconhecido";
     const handleCreateRole = () => {
         setEditingRole(null);
         setFormData({ sistema_id: systems[0]?.id || "", nome: "Usuario" });
@@ -871,6 +890,7 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
                                 <th className="p-3 text-left font-medium">Papel</th>
                                 <th className="p-3 text-left font-medium">Sistema</th>
                                 <th className="p-3 text-left font-medium">Descrição</th>
+                                <th className="p-3 text-left font-medium">Usuários</th>
                                 <th className="p-3 text-right font-medium">Ações</th>
                             </tr>
                         </thead>
@@ -884,6 +904,9 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
                                         </span>
                                     </td>
                                     <td className="p-3 text-neutral-500">{role.descricao}</td>
+                                    <td className="p-3 text-neutral-500">
+                                        {(usersByRole.get(role.id) ?? []).join(", ") || "—"}
+                                    </td>
                                     <td className="p-3 text-right">
                                         <div className="flex justify-end gap-1">
                                             <ActionTooltip label="Editar">
