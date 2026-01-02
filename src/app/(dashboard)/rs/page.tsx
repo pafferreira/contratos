@@ -470,14 +470,14 @@ export default function RSPage() {
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={openCreateEsp} disabled={!supabase}>
-              <Plus className="size-4 mr-2" />
+              <Plus className="mr-2 size-4" />
               Nova ESP
             </Button>
             <Button
               onClick={() => openCreateRs(espData[0]?.id ?? "")}
               disabled={!supabase || espData.length === 0}
             >
-              <Plus className="size-4 mr-2" />
+              <Plus className="mr-2 size-4" />
               Nova RS
             </Button>
           </div>
@@ -503,13 +503,13 @@ export default function RSPage() {
                     "flex w-full items-start transition-all duration-200",
                     espDialogOpen && espDialogMode === "edit" && espForm.id === esp.id
                       ? "border-l-4 border-brand-600 bg-brand-50"
-                      : "group-data-[state=open]:border-l-4 group-data-[state=open]:border-blue-500 group-data-[state=open]:bg-blue-50 hover:bg-neutral-50"
+                      : "hover:bg-neutral-50 group-data-[state=open]:border-l-4 group-data-[state=open]:border-blue-500 group-data-[state=open]:bg-blue-50"
                   )}
                 >
                   <Accordion.Trigger className="flex flex-1 flex-col px-4 text-left focus:outline-none">
                     <div className="flex w-full items-start gap-3 pb-1 pt-3">
                       <ChevronDown
-                        className="size-4 shrink-0 mt-1 text-neutral-400 transition-transform group-data-[state=open]:rotate-180"
+                        className="mt-1 size-4 shrink-0 text-neutral-400 transition-transform group-data-[state=open]:rotate-180"
                         aria-hidden
                       />
                       <div className="grid flex-1 grid-cols-11 items-start gap-3">
@@ -610,7 +610,7 @@ export default function RSPage() {
                     </p>
                   </div>
                   <Button size="sm" onClick={() => openCreateRs(esp.id)} disabled={!supabase}>
-                    <Plus className="size-4 mr-2" />
+                    <Plus className="mr-2 size-4" />
                     Nova RS
                   </Button>
                 </div>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useSupabase } from "@/components/providers/supabase-provider";
-import { Database } from "@/lib/supabase/types";
+import type { Database } from "@/lib/supabase/types";
 import {
     Loader2,
     Plus,
@@ -93,7 +93,7 @@ export function AccessControlClient() {
             </div>
 
             {error && (
-                <div className="rounded-md bg-red-50 p-4 text-sm text-red-600 border border-red-200">
+                <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-600">
                     {error}
                 </div>
             )}
@@ -101,15 +101,15 @@ export function AccessControlClient() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
                     <TabsTrigger value="users" className="gap-2">
-                        <Users className="h-4 w-4" />
+                        <Users className="size-4" />
                         Usuários
                     </TabsTrigger>
                     <TabsTrigger value="systems" className="gap-2">
-                        <Monitor className="h-4 w-4" />
+                        <Monitor className="size-4" />
                         Sistemas
                     </TabsTrigger>
                     <TabsTrigger value="roles" className="gap-2">
-                        <Shield className="h-4 w-4" />
+                        <Shield className="size-4" />
                         Papeis
                     </TabsTrigger>
                 </TabsList>
@@ -211,14 +211,14 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh, supabase }: any
     return (
         <>
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-neutral-500" />
+                <div className="relative max-w-sm flex-1">
+                    <Search className="absolute left-2.5 top-2.5 size-4 text-neutral-500" />
                     <input
                         type="text"
                         placeholder="Buscar usuários..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-full rounded-md border border-neutral-200 bg-white pl-9 pr-4 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                        className="w-full rounded-md border border-neutral-200 bg-white py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                     />
                 </div>
                 <div className="flex items-center gap-2">
@@ -229,7 +229,7 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh, supabase }: any
                             className={cn("h-7 w-7", viewMode === "cards" && "bg-neutral-100 text-neutral-900")}
                             onClick={() => setViewMode("cards")}
                         >
-                            <LayoutGrid className="h-4 w-4" />
+                            <LayoutGrid className="size-4" />
                         </Button>
                         <Button
                             variant="ghost"
@@ -237,11 +237,11 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh, supabase }: any
                             className={cn("h-7 w-7", viewMode === "list" && "bg-neutral-100 text-neutral-900")}
                             onClick={() => setViewMode("list")}
                         >
-                            <List className="h-4 w-4" />
+                            <List className="size-4" />
                         </Button>
                     </div>
                     <Button onClick={() => { setEditingUser(null); setFormData({ ativo: true }); setIsDialogOpen(true); }}>
-                        <Plus className="mr-2 h-4 w-4" />
+                        <Plus className="mr-2 size-4" />
                         Novo Usuário
                     </Button>
                 </div>
@@ -250,32 +250,32 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh, supabase }: any
             {viewMode === "cards" ? (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {filteredUsers.map((user: ZUser) => (
-                        <Card key={user.id} className="flex flex-col justify-between p-4 hover:shadow-md transition-shadow">
+                        <Card key={user.id} className="flex flex-col justify-between p-4 transition-shadow hover:shadow-md">
                             <div>
                                 <div className="flex items-start justify-between">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-brand-700 font-bold">
+                                    <div className="flex size-10 items-center justify-center rounded-full bg-brand-100 font-bold text-brand-700">
                                         {user.nome_completo?.charAt(0).toUpperCase() || "U"}
                                     </div>
                                     <div className="flex gap-1">
                                         <ActionTooltip label="Gerenciar Acessos">
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-brand-600"
+                                            <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600"
                                                 onClick={() => { setSelectedUserForRoles(user); setIsRolesDialogOpen(true); }}
                                             >
-                                                <Lock className="h-4 w-4" />
+                                                <Lock className="size-4" />
                                             </Button>
                                         </ActionTooltip>
                                         <ActionTooltip label="Editar">
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-brand-600"
+                                            <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600"
                                                 onClick={() => { setEditingUser(user); setFormData(user); setIsDialogOpen(true); }}
                                             >
-                                                <Pencil className="h-4 w-4" />
+                                                <Pencil className="size-4" />
                                             </Button>
                                         </ActionTooltip>
                                         <ActionTooltip label="Excluir">
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-red-600"
+                                            <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-red-600"
                                                 onClick={() => confirmDelete(user)}
                                             >
-                                                <Trash2 className="h-4 w-4" />
+                                                <Trash2 className="size-4" />
                                             </Button>
                                         </ActionTooltip>
                                     </div>
@@ -316,24 +316,24 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh, supabase }: any
                                     <td className="p-3 text-right">
                                         <div className="flex justify-end gap-1">
                                             <ActionTooltip label="Gerenciar Acessos">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-brand-600"
+                                                <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600"
                                                     onClick={() => { setSelectedUserForRoles(user); setIsRolesDialogOpen(true); }}
                                                 >
-                                                    <Lock className="h-4 w-4" />
+                                                    <Lock className="size-4" />
                                                 </Button>
                                             </ActionTooltip>
                                             <ActionTooltip label="Editar">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-brand-600"
+                                                <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600"
                                                     onClick={() => { setEditingUser(user); setFormData(user); setIsDialogOpen(true); }}
                                                 >
-                                                    <Pencil className="h-4 w-4" />
+                                                    <Pencil className="size-4" />
                                                 </Button>
                                             </ActionTooltip>
                                             <ActionTooltip label="Excluir">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-red-600"
+                                                <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-red-600"
                                                     onClick={() => confirmDelete(user)}
                                                 >
-                                                    <Trash2 className="h-4 w-4" />
+                                                    <Trash2 className="size-4" />
                                                 </Button>
                                             </ActionTooltip>
                                         </div>
@@ -348,8 +348,8 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh, supabase }: any
             {/* User Dialog */}
             <Dialog.Root open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <Dialog.Portal>
-                    <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
-                    <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-xl z-50">
+                    <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
+                    <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-xl">
                         <Dialog.Title className="text-lg font-bold">
                             {editingUser ? "Editar Usuário" : "Novo Usuário"}
                         </Dialog.Title>
@@ -383,7 +383,7 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh, supabase }: any
                         <div className="mt-6 flex justify-end gap-2">
                             <Button variant="secondary" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
                             <Button onClick={handleSave} disabled={saving}>
-                                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
+                                {saving ? <Loader2 className="size-4 animate-spin" /> : "Salvar"}
                             </Button>
                         </div>
                     </Dialog.Content>
@@ -483,12 +483,12 @@ function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onR
     return (
         <Dialog.Root open={isOpen} onOpenChange={onClose}>
             <Dialog.Portal>
-                <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
-                <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-xl z-50 max-h-[80vh] overflow-y-auto">
-                    <Dialog.Title className="text-lg font-bold mb-1">
+                <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
+                <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[80vh] w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+                    <Dialog.Title className="mb-1 text-lg font-bold">
                         Acessos de {user.nome_completo}
                     </Dialog.Title>
-                    <Dialog.Description className="text-sm text-neutral-500 mb-4">
+                    <Dialog.Description className="mb-4 text-sm text-neutral-500">
                         Gerencie os papeis atribuídos a este usuário em cada sistema.
                     </Dialog.Description>
 
@@ -498,16 +498,16 @@ function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onR
                             if (sysRoles.length === 0) return null;
 
                             return (
-                                <div key={sys.id} className="border rounded-lg p-4">
-                                    <h4 className="font-semibold text-neutral-900 mb-3 flex items-center gap-2">
-                                        <Monitor className="h-4 w-4 text-neutral-500" />
+                                <div key={sys.id} className="rounded-lg border p-4">
+                                    <h4 className="mb-3 flex items-center gap-2 font-semibold text-neutral-900">
+                                        <Monitor className="size-4 text-neutral-500" />
                                         {sys.nome}
                                     </h4>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                         {sysRoles.map((role: ZRole) => {
                                             const hasRole = currentUserRoles.some((ur: ZUserRole) => ur.papel_id === role.id);
                                             return (
-                                                <label key={role.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-neutral-50 p-2 rounded">
+                                                <label key={role.id} className="flex cursor-pointer items-center gap-2 rounded p-2 text-sm hover:bg-neutral-50">
                                                     <input
                                                         type="checkbox"
                                                         checked={hasRole}
@@ -587,9 +587,9 @@ function SystemsTab({ systems, onRefresh, supabase }: any) {
 
     return (
         <>
-            <div className="flex justify-end mb-4">
+            <div className="mb-4 flex justify-end">
                 <Button onClick={() => { setEditingSystem(null); setFormData({ ativo: true }); setIsDialogOpen(true); }}>
-                    <Plus className="mr-2 h-4 w-4" />
+                    <Plus className="mr-2 size-4" />
                     Novo Sistema
                 </Button>
             </div>
@@ -597,25 +597,25 @@ function SystemsTab({ systems, onRefresh, supabase }: any) {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {systems.map((sys: ZSystem) => (
                     <Card key={sys.id} className="p-4">
-                        <div className="flex justify-between items-start">
+                        <div className="flex items-start justify-between">
                             <div className="flex items-center gap-2">
-                                <Monitor className="h-5 w-5 text-brand-600" />
+                                <Monitor className="size-5 text-brand-600" />
                                 <h3 className="font-semibold">{sys.nome}</h3>
                             </div>
                             <div className="flex gap-1">
                                 <ActionTooltip label="Editar">
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingSystem(sys); setFormData(sys); setIsDialogOpen(true); }}>
-                                        <Pencil className="h-4 w-4" />
+                                    <Button variant="ghost" size="icon" className="size-8" onClick={() => { setEditingSystem(sys); setFormData(sys); setIsDialogOpen(true); }}>
+                                        <Pencil className="size-4" />
                                     </Button>
                                 </ActionTooltip>
                                 <ActionTooltip label="Excluir">
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => confirmDelete(sys)}>
-                                        <Trash2 className="h-4 w-4" />
+                                    <Button variant="ghost" size="icon" className="size-8 text-red-500" onClick={() => confirmDelete(sys)}>
+                                        <Trash2 className="size-4" />
                                     </Button>
                                 </ActionTooltip>
                             </div>
                         </div>
-                        <p className="text-sm text-neutral-500 mt-2">{sys.descricao || "Sem descrição"}</p>
+                        <p className="mt-2 text-sm text-neutral-500">{sys.descricao || "Sem descrição"}</p>
                         <div className="mt-4 flex items-center gap-2">
                             <span className={cn("inline-flex h-2 w-2 rounded-full", sys.ativo ? "bg-green-500" : "bg-neutral-300")} />
                             <span className="text-xs text-neutral-500">{sys.ativo ? "Ativo" : "Inativo"}</span>
@@ -626,8 +626,8 @@ function SystemsTab({ systems, onRefresh, supabase }: any) {
 
             <Dialog.Root open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <Dialog.Portal>
-                    <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
-                    <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-xl z-50">
+                    <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
+                    <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-xl">
                         <Dialog.Title className="text-lg font-bold">
                             {editingSystem ? "Editar Sistema" : "Novo Sistema"}
                         </Dialog.Title>
@@ -661,7 +661,7 @@ function SystemsTab({ systems, onRefresh, supabase }: any) {
                         <div className="mt-6 flex justify-end gap-2">
                             <Button variant="secondary" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
                             <Button onClick={handleSave} disabled={saving}>
-                                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
+                                {saving ? <Loader2 className="size-4 animate-spin" /> : "Salvar"}
                             </Button>
                         </div>
                     </Dialog.Content>
@@ -771,14 +771,14 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
     return (
         <>
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-neutral-500" />
+                <div className="relative max-w-sm flex-1">
+                    <Search className="absolute left-2.5 top-2.5 size-4 text-neutral-500" />
                     <input
                         type="text"
                         placeholder="Buscar papeis..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-full rounded-md border border-neutral-200 bg-white pl-9 pr-4 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                        className="w-full rounded-md border border-neutral-200 bg-white py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                     />
                 </div>
                 <div className="flex items-center gap-2">
@@ -789,7 +789,7 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
                             className={cn("h-7 w-7", viewMode === "cards" && "bg-neutral-100 text-neutral-900")}
                             onClick={() => setViewMode("cards")}
                         >
-                            <LayoutGrid className="h-4 w-4" />
+                            <LayoutGrid className="size-4" />
                         </Button>
                         <Button
                             variant="ghost"
@@ -797,11 +797,11 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
                             className={cn("h-7 w-7", viewMode === "list" && "bg-neutral-100 text-neutral-900")}
                             onClick={() => setViewMode("list")}
                         >
-                            <List className="h-4 w-4" />
+                            <List className="size-4" />
                         </Button>
                     </div>
                     <Button onClick={() => { setEditingRole(null); setFormData({ sistema_id: systems[0]?.id || "", nome: "Usuario" }); setIsDialogOpen(true); }}>
-                        <Plus className="mr-2 h-4 w-4" />
+                        <Plus className="mr-2 size-4" />
                         Novo Papel
                     </Button>
                 </div>
@@ -810,11 +810,11 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
             {viewMode === "cards" ? (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {filteredRoles.map((role: ZRole) => (
-                        <Card key={role.id} className="p-4 hover:shadow-md transition-shadow">
-                            <div className="flex justify-between items-start">
+                        <Card key={role.id} className="p-4 transition-shadow hover:shadow-md">
+                            <div className="flex items-start justify-between">
                                 <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Shield className="h-4 w-4 text-brand-600" />
+                                    <div className="mb-1 flex items-center gap-2">
+                                        <Shield className="size-4 text-brand-600" />
                                         <h3 className="font-semibold text-neutral-900">{role.nome}</h3>
                                     </div>
                                     <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
@@ -823,18 +823,18 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
                                 </div>
                                 <div className="flex gap-1">
                                     <ActionTooltip label="Editar">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-brand-600" onClick={() => { setEditingRole(role); setFormData(role); setIsDialogOpen(true); }}>
-                                            <Pencil className="h-4 w-4" />
+                                        <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => { setEditingRole(role); setFormData(role); setIsDialogOpen(true); }}>
+                                            <Pencil className="size-4" />
                                         </Button>
                                     </ActionTooltip>
                                     <ActionTooltip label="Excluir">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-red-600" onClick={() => confirmDelete(role)}>
-                                            <Trash2 className="h-4 w-4" />
+                                        <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-red-600" onClick={() => confirmDelete(role)}>
+                                            <Trash2 className="size-4" />
                                         </Button>
                                     </ActionTooltip>
                                 </div>
                             </div>
-                            <p className="text-sm text-neutral-500 mt-3 line-clamp-2">{role.descricao || "Sem descrição"}</p>
+                            <p className="mt-3 line-clamp-2 text-sm text-neutral-500">{role.descricao || "Sem descrição"}</p>
                         </Card>
                     ))}
                 </div>
@@ -862,13 +862,13 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
                                     <td className="p-3 text-right">
                                         <div className="flex justify-end gap-1">
                                             <ActionTooltip label="Editar">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-brand-600" onClick={() => { setEditingRole(role); setFormData(role); setIsDialogOpen(true); }}>
-                                                    <Pencil className="h-4 w-4" />
+                                                <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => { setEditingRole(role); setFormData(role); setIsDialogOpen(true); }}>
+                                                    <Pencil className="size-4" />
                                                 </Button>
                                             </ActionTooltip>
                                             <ActionTooltip label="Excluir">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-red-600" onClick={() => confirmDelete(role)}>
-                                                    <Trash2 className="h-4 w-4" />
+                                                <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-red-600" onClick={() => confirmDelete(role)}>
+                                                    <Trash2 className="size-4" />
                                                 </Button>
                                             </ActionTooltip>
                                         </div>
@@ -887,8 +887,8 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
 
             <Dialog.Root open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <Dialog.Portal>
-                    <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
-                    <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-xl z-50">
+                    <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
+                    <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-xl">
                         <Dialog.Title className="text-lg font-bold">
                             {editingRole ? "Editar Papel" : "Novo Papel"}
                         </Dialog.Title>
@@ -896,7 +896,7 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
                             <div>
                                 <label className="text-sm font-medium">Sistema</label>
                                 <select
-                                    className="w-full rounded-md border p-2 text-sm bg-white"
+                                    className="w-full rounded-md border bg-white p-2 text-sm"
                                     value={formData.sistema_id || ""}
                                     onChange={e => setFormData({ ...formData, sistema_id: e.target.value })}
                                 >
@@ -909,7 +909,7 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
                             <div>
                                 <label className="text-sm font-medium">Nome do Papel</label>
                                 <select
-                                    className="w-full rounded-md border p-2 text-sm bg-white"
+                                    className="w-full rounded-md border bg-white p-2 text-sm"
                                     value={formData.nome || "Usuario"}
                                     onChange={e => setFormData({ ...formData, nome: e.target.value })}
                                 >
@@ -930,7 +930,7 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
                         <div className="mt-6 flex justify-end gap-2">
                             <Button variant="secondary" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
                             <Button onClick={handleSave} disabled={saving}>
-                                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
+                                {saving ? <Loader2 className="size-4 animate-spin" /> : "Salvar"}
                             </Button>
                         </div>
                     </Dialog.Content>
@@ -992,7 +992,7 @@ function ActionTooltip({ label, children }: { label: string, children: React.Rea
                     <Tooltip.Content
                         side="top"
                         sideOffset={6}
-                        className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg z-50"
+                        className="z-50 rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
                     >
                         {label}
                         <Tooltip.Arrow className="fill-white" />

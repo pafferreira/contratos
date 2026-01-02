@@ -725,7 +725,7 @@ export default function ApontamentoPage() {
                                                                     {entry.aprovado && (
                                                                         <Tooltip>
                                                                             <TooltipTrigger asChild>
-                                                                                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 cursor-default">
+                                                                                <span className="cursor-default rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
                                                                                     Aprovado
                                                                                 </span>
                                                                             </TooltipTrigger>
@@ -875,7 +875,7 @@ export default function ApontamentoPage() {
 
                                 <div>
                                     <label htmlFor="projeto_id" className="block text-sm font-medium text-neutral-700">
-                                        Projeto (RS) <span className="text-neutral-400 text-xs font-normal">(Opcional)</span>
+                                        Projeto (RS) <span className="text-xs font-normal text-neutral-400">(Opcional)</span>
                                     </label>
                                     <select
                                         id="projeto_id"
