@@ -695,12 +695,12 @@ export default function RecursosPage() {
         actions={
           activeTab === "resources" ? (
             <Button onClick={openCreateForm}>
-              <Plus className="mr-2 size-4" />
+              <Plus className="size-4 mr-2" />
               Novo recurso
             </Button>
           ) : (
             <Button onClick={openProfileCreate}>
-              <Plus className="mr-2 size-4" />
+              <Plus className="size-4 mr-2" />
               Novo perfil
             </Button>
           )
@@ -798,7 +798,7 @@ export default function RecursosPage() {
                   disabled={refreshing}
                   type="button"
                 >
-                  <RefreshCcw className={clsx("mr-2 size-4", refreshing && "animate-spin")} />
+                  <RefreshCcw className={clsx("size-4 mr-2", refreshing && "animate-spin")} />
                   Atualizar
                 </Button>
               </div>
@@ -861,7 +861,7 @@ export default function RecursosPage() {
                           <Tooltip.Root>
                             <Tooltip.Trigger asChild>
                               <Button variant="secondary" size="sm" onClick={() => openEditForm(resource)}>
-                                <Pencil className="mr-2 size-4" />
+                                <Pencil className="size-4 mr-2" />
                                 Editar
                               </Button>
                             </Tooltip.Trigger>
@@ -994,7 +994,7 @@ export default function RecursosPage() {
                                       onClick={() => openEditForm(resource)}
                                       type="button"
                                     >
-                                      <Pencil className="mr-2 size-4" />
+                                      <Pencil className="size-4 mr-2" />
                                       Editar
                                     </Button>
                                   </Tooltip.Trigger>
@@ -1261,7 +1261,7 @@ export default function RecursosPage() {
               onClick={handleProfileRefresh}
               disabled={profileLoading}
             >
-              <RefreshCcw className={clsx("mr-2 size-4", profileLoading && "animate-spin")} />
+              <RefreshCcw className={clsx("size-4 mr-2", profileLoading && "animate-spin")} />
               Atualizar
             </Button>
           </div>
@@ -1313,7 +1313,7 @@ export default function RecursosPage() {
                                     type="button"
                                     onClick={() => openProfileEdit(profile)}
                                   >
-                                    <Pencil className="mr-2 size-4" />
+                                    <Pencil className="size-4 mr-2" />
                                     Editar
                                   </Button>
                                 </Tooltip.Trigger>

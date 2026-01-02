@@ -103,6 +103,34 @@ const normalizeCurrencyInput = (value: string) => {
   return { raw: numeric, display: currency.format(Number(numeric)) };
 };
 
+const formatPeriod = (inicio?: string | null, fim?: string | null) => {
+  if (!inicio && !fim) return "Período não informado";
+  const formatDate = (d: string) => {
+    if (!d) return "?";
+    const [y, m, day] = d.split("-");
+    return `${day}/${m}/${y}`;
+  };
+  const i = inicio ? formatDate(inicio) : "?";
+  const f = fim ? formatDate(fim) : "?";
+  return `${i} - ${f}`;
+};
+
+const mapRs = (rows: RSRow[]): RS[] =>
+  rows.map((rs) => ({
+    id: rs.id,
+    code: rs.codigo_rs ?? rs.id,
+    espId: rs.especificacao_id ?? "",
+    title: rs.titulo ?? "Título não informado",
+    status: (rs.status as RSStatus) ?? "planejada",
+    period: formatPeriod(rs.inicio_planejado ?? rs.inicio_real, rs.fim_planejado ?? rs.fim_real),
+    value: rs.valor_total ?? null,
+    responsavel_cliente: rs.responsavel_cliente ?? "—",
+    responsavel_bu: rs.responsavel_bu ?? "—",
+    owner: "", // Deprecated
+    raw_inicio: rs.inicio_planejado ?? rs.inicio_real ?? null,
+    raw_fim: rs.fim_planejado ?? rs.fim_real ?? null
+  }));
+
 export default function RSPage() {
   const { supabase } = useSupabase();
   const [loading, setLoading] = useState(true);
@@ -152,34 +180,6 @@ export default function RSPage() {
     () => espData.find((esp) => esp.id === selectedEspId) ?? null,
     [espData, selectedEspId]
   );
-
-  const formatPeriod = (inicio?: string | null, fim?: string | null) => {
-    if (!inicio && !fim) return "Período não informado";
-    const formatDate = (d: string) => {
-      if (!d) return "?";
-      const [y, m, day] = d.split("-");
-      return `${day}/${m}/${y}`;
-    };
-    const i = inicio ? formatDate(inicio) : "?";
-    const f = fim ? formatDate(fim) : "?";
-    return `${i} - ${f}`;
-  };
-
-  const mapRs = (rows: RSRow[]): RS[] =>
-    rows.map((rs) => ({
-      id: rs.id,
-      code: rs.codigo_rs ?? rs.id,
-      espId: rs.especificacao_id ?? "",
-      title: rs.titulo ?? "Título não informado",
-      status: (rs.status as RSStatus) ?? "planejada",
-      period: formatPeriod(rs.inicio_planejado ?? rs.inicio_real, rs.fim_planejado ?? rs.fim_real),
-      value: rs.valor_total ?? null,
-      responsavel_cliente: rs.responsavel_cliente ?? "—",
-      responsavel_bu: rs.responsavel_bu ?? "—",
-      owner: "", // Deprecated
-      raw_inicio: rs.inicio_planejado ?? rs.inicio_real ?? null,
-      raw_fim: rs.fim_planejado ?? rs.fim_real ?? null
-    }));
 
   const loadData = useCallback(async () => {
     if (!supabase) {
@@ -470,14 +470,14 @@ export default function RSPage() {
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={openCreateEsp} disabled={!supabase}>
-              <Plus className="mr-2 size-4" />
+              <Plus className="size-4 mr-2" />
               Nova ESP
             </Button>
             <Button
               onClick={() => openCreateRs(espData[0]?.id ?? "")}
               disabled={!supabase || espData.length === 0}
             >
-              <Plus className="mr-2 size-4" />
+              <Plus className="size-4 mr-2" />
               Nova RS
             </Button>
           </div>
@@ -500,17 +500,16 @@ export default function RSPage() {
               <Accordion.Header className="flex w-full">
                 <div
                   className={clsx(
-                    "flex w-full items-start",
-                    "transition-all duration-200",
+                    "flex w-full items-start transition-all duration-200",
                     espDialogOpen && espDialogMode === "edit" && espForm.id === esp.id
                       ? "border-l-4 border-brand-600 bg-brand-50"
-                      : "hover:bg-neutral-50 group-data-[state=open]:bg-blue-50 group-data-[state=open]:border-l-4 group-data-[state=open]:border-blue-500"
+                      : "group-data-[state=open]:border-l-4 group-data-[state=open]:border-blue-500 group-data-[state=open]:bg-blue-50 hover:bg-neutral-50"
                   )}
                 >
                   <Accordion.Trigger className="flex flex-1 flex-col px-4 text-left focus:outline-none">
-                    <div className="flex w-full items-start gap-3 pt-3 pb-1">
+                    <div className="flex w-full items-start gap-3 pb-1 pt-3">
                       <ChevronDown
-                        className="mt-1 size-4 flex-shrink-0 text-neutral-400 transition-transform group-data-[state=open]:rotate-180"
+                        className="size-4 shrink-0 mt-1 text-neutral-400 transition-transform group-data-[state=open]:rotate-180"
                         aria-hidden
                       />
                       <div className="grid flex-1 grid-cols-11 items-start gap-3">
@@ -534,7 +533,7 @@ export default function RSPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="-mt-1 flex items-center gap-2 pl-7 pb-2 text-xs text-neutral-600">
+                    <div className="-mt-1 flex items-center gap-2 pb-2 pl-7 text-xs text-neutral-600">
                       <span className="font-medium">Vigência:</span>
                       <span>{formatPeriod(esp.data_inicio, esp.data_fim)}</span>
                     </div>
@@ -611,7 +610,7 @@ export default function RSPage() {
                     </p>
                   </div>
                   <Button size="sm" onClick={() => openCreateRs(esp.id)} disabled={!supabase}>
-                    <Plus className="mr-2 size-4" />
+                    <Plus className="size-4 mr-2" />
                     Nova RS
                   </Button>
                 </div>

@@ -14,14 +14,14 @@ export default async function SystemsPage() {
   if (!supabaseClient || userError || !user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-neutral-25 px-4">
-        <div className="max-w-xl rounded-2xl border border-neutral-200 bg-white p-8 shadow-card text-center">
+        <div className="max-w-xl rounded-2xl border border-neutral-200 bg-white p-8 text-center shadow-card">
           <h1 className="text-xl font-semibold text-neutral-800">Acesso restrito</h1>
           <p className="mt-2 text-sm text-neutral-600">
             Você precisa estar logado para acessar esta página.
           </p>
           <Link
             href="/signin"
-            className="mt-6 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 transition-colors"
+            className="mt-6 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
           >
             Ir para Login
           </Link>
