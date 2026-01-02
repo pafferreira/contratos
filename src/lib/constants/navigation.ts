@@ -4,6 +4,7 @@ import {
   FolderGit2,
   HandCoins,
   LayoutDashboard,
+  Shield,
   Users,
   Waypoints,
   FileText,
@@ -26,5 +27,6 @@ export const DASHBOARD_NAV: NavItem[] = [
   { title: "Recursos ATE", href: "/recursos", icon: Users },
   { title: "Apontamento de Horas", href: "/apontamento", icon: Clock },
 
-  { title: "Controle de Acesso", href: "/acesso", icon: ShieldCheck }
+  { title: "Controle de Acesso", href: "/acesso", icon: ShieldCheck },
+  { title: "Admin Acessos", href: "/acesso-admin", icon: Shield }
 ];

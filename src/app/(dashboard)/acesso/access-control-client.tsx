@@ -136,6 +136,8 @@ export function AccessControlClient() {
                 <TabsContent value="roles" className="mt-6 space-y-4">
                     <RolesTab
                         roles={roles}
+                        users={users}
+                        userRoles={userRoles}
                         systems={systems}
                         onRefresh={loadData}
                         supabase={supabase}
@@ -713,7 +715,7 @@ function SystemsTab({ systems, onRefresh, supabase }: any) {
 
 // --- Roles Tab Component ---
 
-function RolesTab({ roles, systems, onRefresh, supabase }: any) {
+function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any) {
     const [search, setSearch] = useState("");
     const [viewMode, setViewMode] = useState<"cards" | "list">("list");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -723,6 +725,8 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
 
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [pendingDelete, setPendingDelete] = useState<ZRole | null>(null);
+    const [isRoleUsersOpen, setIsRoleUsersOpen] = useState(false);
+    const [selectedRoleForUsers, setSelectedRoleForUsers] = useState<ZRole | null>(null);
 
     const filteredRoles = roles.filter((r: ZRole) =>
         r.nome.toLowerCase().includes(search.toLowerCase()) ||
@@ -767,6 +771,22 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
     };
 
     const getSystemName = (id: string) => systems.find((s: ZSystem) => s.id === id)?.nome || "Desconhecido";
+    const handleCreateRole = () => {
+        setEditingRole(null);
+        setFormData({ sistema_id: systems[0]?.id || "", nome: "Usuario" });
+        setIsDialogOpen(true);
+    };
+
+    const handleEditRole = (role: ZRole) => {
+        setEditingRole(role);
+        setFormData(role);
+        setIsDialogOpen(true);
+    };
+
+    const handleManageUsers = (role: ZRole) => {
+        setSelectedRoleForUsers(role);
+        setIsRoleUsersOpen(true);
+    };
 
     return (
         <>
@@ -800,7 +820,7 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
                             <List className="size-4" />
                         </Button>
                     </div>
-                    <Button onClick={() => { setEditingRole(null); setFormData({ sistema_id: systems[0]?.id || "", nome: "Usuario" }); setIsDialogOpen(true); }}>
+                    <Button onClick={handleCreateRole}>
                         <Plus className="mr-2 size-4" />
                         Novo Papel
                     </Button>
@@ -823,8 +843,13 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
                                 </div>
                                 <div className="flex gap-1">
                                     <ActionTooltip label="Editar">
-                                        <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => { setEditingRole(role); setFormData(role); setIsDialogOpen(true); }}>
+                                        <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleEditRole(role)}>
                                             <Pencil className="size-4" />
+                                        </Button>
+                                    </ActionTooltip>
+                                    <ActionTooltip label="Usuários">
+                                        <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleManageUsers(role)}>
+                                            <Users className="size-4" />
                                         </Button>
                                     </ActionTooltip>
                                     <ActionTooltip label="Excluir">
@@ -843,7 +868,7 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
                     <table className="w-full text-sm">
                         <thead className="bg-neutral-50 text-neutral-500">
                             <tr>
-                                <th className="p-3 text-left font-medium">Nome</th>
+                                <th className="p-3 text-left font-medium">Papel</th>
                                 <th className="p-3 text-left font-medium">Sistema</th>
                                 <th className="p-3 text-left font-medium">Descrição</th>
                                 <th className="p-3 text-right font-medium">Ações</th>
@@ -862,8 +887,13 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
                                     <td className="p-3 text-right">
                                         <div className="flex justify-end gap-1">
                                             <ActionTooltip label="Editar">
-                                                <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => { setEditingRole(role); setFormData(role); setIsDialogOpen(true); }}>
+                                                <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleEditRole(role)}>
                                                     <Pencil className="size-4" />
+                                                </Button>
+                                            </ActionTooltip>
+                                            <ActionTooltip label="Usuários">
+                                                <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleManageUsers(role)}>
+                                                    <Users className="size-4" />
                                                 </Button>
                                             </ActionTooltip>
                                             <ActionTooltip label="Excluir">
@@ -937,6 +967,20 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
                 </Dialog.Portal>
             </Dialog.Root>
 
+            {/* Role Users Dialog */}
+            {selectedRoleForUsers && (
+                <RoleUsersDialog
+                    role={selectedRoleForUsers}
+                    users={users}
+                    systems={systems}
+                    userRoles={userRoles}
+                    isOpen={isRoleUsersOpen}
+                    onClose={() => setIsRoleUsersOpen(false)}
+                    onRefresh={onRefresh}
+                    supabase={supabase}
+                />
+            )}
+
             {/* Delete Confirmation Dialog */}
             <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
                 <Dialog.Portal>
@@ -977,6 +1021,80 @@ function RolesTab({ roles, systems, onRefresh, supabase }: any) {
                 </Dialog.Portal>
             </Dialog.Root>
         </>
+    );
+}
+
+// --- Role Users Dialog ---
+
+function RoleUsersDialog({ role, users, systems, userRoles, isOpen, onClose, onRefresh, supabase }: any) {
+    const [saving, setSaving] = useState(false);
+
+    const currentRoleUsers = userRoles.filter((ur: ZUserRole) => ur.papel_id === role.id);
+    const currentUserIds = new Set(currentRoleUsers.map((ur: ZUserRole) => ur.usuario_id));
+    const systemName = systems.find((sys: ZSystem) => sys.id === role.sistema_id)?.nome || "Desconhecido";
+
+    const handleToggleUser = async (userId: string, checked: boolean) => {
+        setSaving(true);
+        try {
+            if (checked) {
+                await supabase.from("z_usuarios_papeis").insert({ usuario_id: userId, papel_id: role.id });
+            } else {
+                await supabase.from("z_usuarios_papeis").delete().match({ usuario_id: userId, papel_id: role.id });
+            }
+            onRefresh();
+        } catch (err: any) {
+            console.error(err);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const sortedUsers = [...users].sort((a: ZUser, b: ZUser) =>
+        (a.nome_completo || "").localeCompare(b.nome_completo || "")
+    );
+
+    return (
+        <Dialog.Root open={isOpen} onOpenChange={onClose}>
+            <Dialog.Portal>
+                <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
+                <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[80vh] w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+                    <Dialog.Title className="mb-1 text-lg font-bold">
+                        Usuários do papel {role.nome}
+                    </Dialog.Title>
+                    <Dialog.Description className="mb-4 text-sm text-neutral-500">
+                        Gerencie os usuários vinculados ao papel no sistema {systemName}.
+                    </Dialog.Description>
+
+                    <div className="space-y-3">
+                        {sortedUsers.map((user: ZUser) => {
+                            const isChecked = currentUserIds.has(user.id);
+                            return (
+                                <label key={user.id} className="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-neutral-100 px-3 py-2 text-sm hover:bg-neutral-50">
+                                    <div>
+                                        <div className="font-medium text-neutral-900">{user.nome_completo || "Sem nome"}</div>
+                                        <div className="text-neutral-500">{user.email}</div>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={(e) => handleToggleUser(user.id, e.target.checked)}
+                                        disabled={saving}
+                                        className="rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
+                                    />
+                                </label>
+                            );
+                        })}
+                        {sortedUsers.length === 0 && (
+                            <p className="text-center text-neutral-500">Nenhum usuário cadastrado.</p>
+                        )}
+                    </div>
+
+                    <div className="mt-6 flex justify-end">
+                        <Button onClick={onClose}>Fechar</Button>
+                    </div>
+                </Dialog.Content>
+            </Dialog.Portal>
+        </Dialog.Root>
     );
 }
 
