@@ -35,6 +35,7 @@ export default function AccessGeneralPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [magicLoading, setMagicLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [signOutLoading, setSignOutLoading] = useState(false);
   const [authUser, setAuthUser] = useState<ZUser | null>(null);
@@ -227,10 +228,11 @@ export default function AccessGeneralPage() {
     setMagicLoading(true);
     setMessage(null);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${REDIRECT_PATH}`
+      const { error } = await supabase.functions.invoke("send-auth-email", {
+        body: {
+          email,
+          flow: "magic",
+          redirectTo: `${window.location.origin}/auth/callback?next=${REDIRECT_PATH}`
         }
       });
       if (error) throw error;
@@ -240,6 +242,35 @@ export default function AccessGeneralPage() {
       setMessage("Não foi possível enviar o magic link. Tente novamente.");
     } finally {
       setMagicLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!supabase) {
+      setMessage("Supabase não configurado. Contate o administrador.");
+      return;
+    }
+    if (!email) {
+      setMessage("Informe o e-mail para enviar o link de redefinição.");
+      return;
+    }
+    setResetLoading(true);
+    setMessage(null);
+    try {
+      const { error } = await supabase.functions.invoke("send-auth-email", {
+        body: {
+          email,
+          flow: "reset",
+          redirectTo: `${window.location.origin}/auth/callback?next=/acesso-reset`
+        }
+      });
+      if (error) throw error;
+      setMessage("Link de redefinição enviado. Verifique sua caixa de entrada.");
+    } catch (error) {
+      console.error("Erro ao enviar link de redefinição:", error);
+      setMessage("Não foi possível enviar o link de redefinição. Tente novamente.");
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -414,23 +445,22 @@ export default function AccessGeneralPage() {
                       Recuperação rápida com magic link
                     </p>
                     <p className="mt-1 text-xs text-neutral-500">
-                      Enviaremos um link seguro para acesso imediato e atualização da senha com o
-                      administrador.
+                      Enviaremos um link seguro para criar uma nova senha e retomar o acesso.
                     </p>
                     <Button
                       type="button"
                       variant="secondary"
                       className="mt-3"
-                      onClick={handleMagicLink}
-                      disabled={magicLoading}
+                      onClick={handlePasswordReset}
+                      disabled={resetLoading}
                     >
-                      {magicLoading ? (
+                      {resetLoading ? (
                         <>
                           <Loader2 className="mr-2 size-4 animate-spin" />
                           Enviando...
                         </>
                       ) : (
-                        "Enviar magic link"
+                        "Enviar link de redefinição"
                       )}
                     </Button>
                   </div>

@@ -11,9 +11,9 @@ import * as Dialog from "@radix-ui/react-dialog";
 import {
   Eye,
   EyeOff,
+  KeyRound,
   Loader2,
   Lock,
-  Mail,
   Pencil,
   Plus,
   Search,
@@ -28,7 +28,7 @@ type ZSystem = Database["public"]["Tables"]["z_sistemas"]["Row"];
 
 type StatusFilter = "all" | "active" | "inactive" | "password";
 
-const REDIRECT_PATH = "/acesso-geral";
+const RESET_REDIRECT_PATH = "/acesso-reset";
 
 export function AccessAdminClient() {
   const { supabase } = useSupabase();
@@ -54,12 +54,11 @@ export function AccessAdminClient() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [clearPassword, setClearPassword] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ZUser | null>(null);
-  const [magicLoadingId, setMagicLoadingId] = useState<string | null>(null);
+  const [resetLoadingId, setResetLoadingId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -127,7 +126,6 @@ export function AccessAdminClient() {
     setConfirmPassword("");
     setShowPassword(false);
     setShowConfirm(false);
-    setClearPassword(false);
     setActionMessage(null);
     setIsDialogOpen(true);
   };
@@ -143,7 +141,6 @@ export function AccessAdminClient() {
     setConfirmPassword("");
     setShowPassword(false);
     setShowConfirm(false);
-    setClearPassword(false);
     setActionMessage(null);
     setIsDialogOpen(true);
   };
@@ -170,9 +167,7 @@ export function AccessAdminClient() {
         ativo: formData.ativo ?? true
       };
 
-      if (clearPassword) {
-        payload.senha_hash = null;
-      } else if (passwordValue) {
+      if (passwordValue) {
         payload.senha_hash = await hashPassword(passwordValue);
       }
 
@@ -213,23 +208,28 @@ export function AccessAdminClient() {
     }
   };
 
-  const handleSendMagicLink = async (user: ZUser) => {
+  const handleSendPasswordReset = async (user: ZUser) => {
+    const confirmed = window.confirm(
+      `Enviar link de redefinição de senha para ${user.email}?`
+    );
+    if (!confirmed) return;
     setActionMessage(null);
-    setMagicLoadingId(user.id);
+    setResetLoadingId(user.id);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: user.email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${REDIRECT_PATH}`
+      const { error } = await supabase.functions.invoke("send-auth-email", {
+        body: {
+          email: user.email,
+          flow: "reset",
+          redirectTo: `${window.location.origin}/auth/callback?next=${RESET_REDIRECT_PATH}`
         }
       });
       if (error) throw error;
-      setActionMessage(`Magic link enviado para ${user.email}.`);
+      setActionMessage(`Link de redefinição enviado para ${user.email}.`);
     } catch (err: any) {
-      console.error("Erro ao enviar magic link:", err);
-      setActionMessage("Não foi possível enviar o magic link.");
+      console.error("Erro ao enviar link de redefinicao:", err);
+      setActionMessage("Não foi possível enviar o link de redefinição.");
     } finally {
-      setMagicLoadingId(null);
+      setResetLoadingId(null);
     }
   };
 
@@ -388,14 +388,14 @@ export function AccessAdminClient() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      title="Enviar magic link"
-                      onClick={() => handleSendMagicLink(user)}
-                      disabled={magicLoadingId === user.id}
+                      title="Resetar senha"
+                      onClick={() => handleSendPasswordReset(user)}
+                      disabled={resetLoadingId === user.id}
                     >
-                      {magicLoadingId === user.id ? (
+                      {resetLoadingId === user.id ? (
                         <Loader2 className="size-4 animate-spin" />
                       ) : (
-                        <Mail className="size-4" />
+                        <KeyRound className="size-4" />
                       )}
                     </Button>
                     <Button
@@ -513,16 +513,9 @@ export function AccessAdminClient() {
                     {showConfirm ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
                 </div>
-                {editingUser ? (
-                  <label className="flex items-center gap-2 text-xs text-neutral-500">
-                    <input
-                      type="checkbox"
-                      checked={clearPassword}
-                      onChange={(event) => setClearPassword(event.target.checked)}
-                    />
-                    Remover senha atual
-                  </label>
-                ) : null}
+                <p className="text-xs text-neutral-500">
+                  Para redefinir por e-mail, use a ação Resetar senha na lista.
+                </p>
               </div>
             </div>
 

@@ -8,6 +8,8 @@ Esta pasta contém todos os arquivos relacionados ao banco de dados Supabase do 
 supabase/
 ├── migrations/
 │   └── 00_schema_completo.sql    # Schema completo do banco de dados
+├── functions/
+│   └── send-auth-email/          # Edge Function para emails de acesso e reset
 ├── generate-types.ps1             # Script para gerar tipos TypeScript
 └── README.md                      # Esta documentação
 ```
@@ -108,8 +110,43 @@ Quando precisar atualizar o schema:
 2. Aplique as mudanças no Supabase (via Dashboard ou CLI)
 3. Regenere os tipos TypeScript:
    ```powershell
-   .\supabase\generate-types.ps1
+    .\supabase\generate-types.ps1
    ```
+
+### 4. Edge Function - Emails customizados
+
+A função `send-auth-email` envia emails customizados de magic link e redefinição de senha.
+
+**Deploy**
+```bash
+supabase functions deploy send-auth-email
+```
+
+**Secrets necessários**
+```bash
+supabase secrets set \
+  SUPABASE_URL=YOUR_SUPABASE_URL \
+  SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY \
+  SITE_URL=https://seu-dominio.com \
+  SMTP_HOST=smtp.seu-provedor.com \
+  SMTP_PORT=587 \
+  SMTP_USERNAME=usuario_smtp \
+  SMTP_PASSWORD=senha_smtp \
+  SMTP_FROM=no-reply@seu-dominio.com
+```
+
+**Opcionais**
+```bash
+supabase secrets set \
+  SMTP_FROM_NAME="Inventario de Contratos" \
+  SMTP_TLS=true \
+  APP_NAME="Inventario de Contratos" \
+  CORS_ORIGIN=https://seu-dominio.com
+```
+
+**Observacoes**
+- `SITE_URL` deve ser o dominio publico do app.
+- O link gerado redireciona para `/auth/callback?next=/acesso-geral` ou `/acesso-reset`.
 
 ## 📊 Diagrama ER
 

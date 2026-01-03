@@ -25,11 +25,12 @@ export default function SignInPage() {
       return;
     }
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${redirectTo}`,
-      },
+    const { error } = await supabase.functions.invoke("send-auth-email", {
+      body: {
+        email,
+        flow: "magic",
+        redirectTo: `${window.location.origin}/auth/callback?next=${redirectTo}`
+      }
     });
 
     if (error) {
