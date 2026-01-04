@@ -91,6 +91,9 @@ export default function AccessResetPage() {
 
     setSaving(true);
     try {
+      const { error: authError } = await supabase.auth.updateUser({ password });
+      if (authError) throw authError;
+
       const hashed = await hashPassword(password);
       const payload: ZUserUpdate = { senha_hash: hashed };
       const { error: updateError } = await supabase

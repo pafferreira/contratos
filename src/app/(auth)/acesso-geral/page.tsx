@@ -41,7 +41,6 @@ export default function AccessGeneralPage() {
   const [authUser, setAuthUser] = useState<ZUser | null>(null);
   const [systems, setSystems] = useState<SystemWithProfile[]>([]);
   const [systemsLoading, setSystemsLoading] = useState(false);
-  const [forgotOpen, setForgotOpen] = useState(false);
 
   const passwordScore = useMemo(() => {
     let score = 0;
@@ -68,7 +67,7 @@ export default function AccessGeneralPage() {
     if (data?.user?.email) {
       const { data: profile } = await supabase
         .from("z_usuarios")
-        .select("id, email, nome_completo, ativo, senha_hash")
+        .select("id, email, nome_completo, ativo, senha_hash, criado_em, atualizado_em")
         .eq("email", data.user.email)
         .maybeSingle();
 
@@ -118,7 +117,7 @@ export default function AccessGeneralPage() {
 
       const { data: systemsData, error: systemsError } = await supabase
         .from("z_sistemas")
-        .select("id, nome, descricao, ativo")
+        .select("id, nome, descricao, ativo, criado_em, atualizado_em")
         .in("id", systemIds)
         .eq("ativo", true);
 
@@ -174,10 +173,11 @@ export default function AccessGeneralPage() {
     }
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const { data: userRecord, error } = await supabase
         .from("z_usuarios")
-        .select("id, email, nome_completo, ativo, senha_hash")
-        .eq("email", email)
+        .select("id, email, nome_completo, ativo, senha_hash, criado_em, atualizado_em")
+        .ilike("email", normalizedEmail)
         .maybeSingle();
 
       if (error) throw error;
@@ -201,7 +201,7 @@ export default function AccessGeneralPage() {
       }
 
       const { error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password
       });
       if (authError) throw authError;
@@ -228,9 +228,10 @@ export default function AccessGeneralPage() {
     setMagicLoading(true);
     setMessage(null);
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const { error } = await supabase.functions.invoke("send-auth-email", {
         body: {
-          email,
+          email: normalizedEmail,
           flow: "magic",
           redirectTo: `${window.location.origin}/auth/callback?next=${REDIRECT_PATH}`
         }
@@ -257,9 +258,10 @@ export default function AccessGeneralPage() {
     setResetLoading(true);
     setMessage(null);
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const { error } = await supabase.functions.invoke("send-auth-email", {
         body: {
-          email,
+          email: normalizedEmail,
           flow: "reset",
           redirectTo: `${window.location.origin}/auth/callback?next=/acesso-reset`
         }
@@ -432,39 +434,20 @@ export default function AccessGeneralPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setForgotOpen((prev) => !prev)}
-                    className="text-xs font-semibold text-brand-600 hover:text-brand-700"
+                    onClick={handlePasswordReset}
+                    disabled={resetLoading}
+                    className="inline-flex items-center gap-2 text-xs font-semibold text-brand-600 transition hover:text-brand-700 disabled:cursor-not-allowed disabled:text-brand-400"
                   >
-                    Esqueci minha senha
+                    {resetLoading ? (
+                      <>
+                        <Loader2 className="size-3 animate-spin" />
+                        Enviando link...
+                      </>
+                    ) : (
+                      "Esqueci minha senha"
+                    )}
                   </button>
                 </div>
-
-                {forgotOpen ? (
-                  <div className="rounded-xl border border-neutral-100 bg-neutral-50 p-4 text-sm">
-                    <p className="font-medium text-neutral-700">
-                      Recuperação rápida com magic link
-                    </p>
-                    <p className="mt-1 text-xs text-neutral-500">
-                      Enviaremos um link seguro para criar uma nova senha e retomar o acesso.
-                    </p>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="mt-3"
-                      onClick={handlePasswordReset}
-                      disabled={resetLoading}
-                    >
-                      {resetLoading ? (
-                        <>
-                          <Loader2 className="mr-2 size-4 animate-spin" />
-                          Enviando...
-                        </>
-                      ) : (
-                        "Enviar link de redefinição"
-                      )}
-                    </Button>
-                  </div>
-                ) : null}
 
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? (

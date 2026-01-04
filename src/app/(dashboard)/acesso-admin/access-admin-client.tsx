@@ -162,9 +162,10 @@ export function AccessAdminClient() {
         return;
       }
 
+      const normalizedEmail = formData.email.trim().toLowerCase();
       const payload: ZUserInsert = {
         nome_completo: formData.nome_completo ?? "",
-        email: formData.email,
+        email: normalizedEmail,
         ativo: formData.ativo ?? true
       };
 
