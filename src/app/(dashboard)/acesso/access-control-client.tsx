@@ -765,15 +765,24 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
         userRoles.forEach((ur: ZUserRole) => {
             const user = users.find((u: ZUser) => u.id === ur.usuario_id);
             if (!user) return;
-            const list = map.get(ur.papel_id) ?? [];
+            const key = `${ur.papel_id ?? ""}::${ur.sistema_id ?? ""}`;
+            const list = map.get(key) ?? [];
             list.push(user.nome_completo || user.email);
-            map.set(ur.papel_id, list);
+            map.set(key, list);
         });
-        map.forEach((list, roleId) => {
-            map.set(roleId, Array.from(new Set(list)).sort((a, b) => a.localeCompare(b)));
+        map.forEach((list, key) => {
+            map.set(key, Array.from(new Set(list)).sort((a, b) => a.localeCompare(b)));
         });
         return map;
     }, [userRoles, users]);
+
+    const systemNameById = useMemo(() => {
+        const map = new Map<string, string>();
+        systems.forEach((system: ZSystem) => {
+            map.set(system.id, system.nome);
+        });
+        return map;
+    }, [systems]);
 
     const filteredRoles = roles.filter((r: ZRole) => {
         return r.nome.toLowerCase().includes(search.toLowerCase());
@@ -782,11 +791,20 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
     const handleSave = async () => {
         setSaving(true);
         try {
+            const payload = { nome: (formData.nome ?? "").trim() };
+            if (!payload.nome) {
+                alert("Informe o nome do papel.");
+                setSaving(false);
+                return;
+            }
             if (editingRole) {
-                const { error } = await supabase.from("z_papeis").update(formData).eq("id", editingRole.id);
+                const { error } = await supabase
+                    .from("z_papeis")
+                    .update(payload)
+                    .eq("id", editingRole.id);
                 if (error) throw error;
             } else {
-                const { error } = await supabase.from("z_papeis").insert(formData);
+                const { error } = await supabase.from("z_papeis").insert(payload);
                 if (error) throw error;
             }
             setIsDialogOpen(false);
@@ -824,7 +842,7 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
 
     const handleEditRole = (role: ZRole) => {
         setEditingRole(role);
-        setFormData(role);
+        setFormData({ nome: role.nome });
         setIsDialogOpen(true);
     };
 
@@ -901,9 +919,21 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
                                     </ActionTooltip>
                                 </div>
                             </div>
-                            <p className="mt-3 text-xs text-neutral-500">
-                                {(usersByRole.get(role.id) ?? []).length} usuário(s) com este papel.
-                            </p>
+                            <div className="mt-3 space-y-1 text-xs text-neutral-500">
+                                {systems.length === 0 ? (
+                                    <p>Sem sistemas cadastrados.</p>
+                                ) : (
+                                    systems.map((system: ZSystem) => {
+                                        const key = `${role.id}::${system.id}`;
+                                        const total = (usersByRole.get(key) ?? []).length;
+                                        return (
+                                            <p key={system.id}>
+                                                {system.nome}: {total} usuário(s)
+                                            </p>
+                                        );
+                                    })
+                                )}
+                            </div>
                         </Card>
                     ))}
                 </div>
@@ -913,41 +943,78 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
                         <thead className="bg-neutral-50 text-neutral-500">
                             <tr>
                                 <th className="p-3 text-left font-medium">Papel</th>
+                                <th className="p-3 text-left font-medium">Sistema</th>
                                 <th className="p-3 text-left font-medium">Usuários</th>
                                 <th className="p-3 text-right font-medium">Ações</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-100">
                             {filteredRoles.map((role: ZRole) => (
-                                <tr key={role.id} className="hover:bg-neutral-50">
-                                    <td className="p-3 font-medium text-neutral-900">{role.nome}</td>
-                                    <td className="p-3 text-neutral-500">
-                                        {(usersByRole.get(role.id) ?? []).join(", ") || "—"}
-                                    </td>
-                                    <td className="p-3 text-right">
-                                        <div className="flex justify-end gap-1">
-                                            <ActionTooltip label="Editar">
-                                                <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleEditRole(role)}>
-                                                    <Pencil className="size-4" />
-                                                </Button>
-                                            </ActionTooltip>
-                                            <ActionTooltip label="Usuários">
-                                                <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleManageUsers(role)}>
-                                                    <Users className="size-4" />
-                                                </Button>
-                                            </ActionTooltip>
-                                            <ActionTooltip label="Excluir">
-                                                <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-red-600" onClick={() => confirmDelete(role)}>
-                                                    <Trash2 className="size-4" />
-                                                </Button>
-                                            </ActionTooltip>
-                                        </div>
-                                    </td>
-                                </tr>
+                                systems.length > 0 ? (
+                                    systems.map((system: ZSystem) => {
+                                        const key = `${role.id}::${system.id}`;
+                                        const usersList = usersByRole.get(key) ?? [];
+                                        return (
+                                            <tr key={`${role.id}-${system.id}`} className="hover:bg-neutral-50">
+                                                <td className="p-3 font-medium text-neutral-900">{role.nome}</td>
+                                                <td className="p-3 text-neutral-500">
+                                                    {systemNameById.get(system.id) ?? system.id}
+                                                </td>
+                                                <td className="p-3 text-neutral-500">
+                                                    {usersList.join(", ") || "—"}
+                                                </td>
+                                                <td className="p-3 text-right">
+                                                    <div className="flex justify-end gap-1">
+                                                        <ActionTooltip label="Editar">
+                                                            <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleEditRole(role)}>
+                                                                <Pencil className="size-4" />
+                                                            </Button>
+                                                        </ActionTooltip>
+                                                        <ActionTooltip label="Usuários">
+                                                            <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleManageUsers(role)}>
+                                                                <Users className="size-4" />
+                                                            </Button>
+                                                        </ActionTooltip>
+                                                        <ActionTooltip label="Excluir">
+                                                            <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-red-600" onClick={() => confirmDelete(role)}>
+                                                                <Trash2 className="size-4" />
+                                                            </Button>
+                                                        </ActionTooltip>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                ) : (
+                                    <tr key={role.id} className="hover:bg-neutral-50">
+                                        <td className="p-3 font-medium text-neutral-900">{role.nome}</td>
+                                        <td className="p-3 text-neutral-500">—</td>
+                                        <td className="p-3 text-neutral-500">—</td>
+                                        <td className="p-3 text-right">
+                                            <div className="flex justify-end gap-1">
+                                                <ActionTooltip label="Editar">
+                                                    <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleEditRole(role)}>
+                                                        <Pencil className="size-4" />
+                                                    </Button>
+                                                </ActionTooltip>
+                                                <ActionTooltip label="Usuários">
+                                                    <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleManageUsers(role)}>
+                                                        <Users className="size-4" />
+                                                    </Button>
+                                                </ActionTooltip>
+                                                <ActionTooltip label="Excluir">
+                                                    <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-red-600" onClick={() => confirmDelete(role)}>
+                                                        <Trash2 className="size-4" />
+                                                    </Button>
+                                                </ActionTooltip>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )
                             ))}
                             {filteredRoles.length === 0 && (
                                 <tr>
-                                    <td colSpan={3} className="p-4 text-center text-neutral-500">Nenhum papel encontrado.</td>
+                                    <td colSpan={4} className="p-4 text-center text-neutral-500">Nenhum papel encontrado.</td>
                                 </tr>
                             )}
                         </tbody>

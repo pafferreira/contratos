@@ -20,7 +20,7 @@ export default async function SystemsPage() {
             Você precisa estar logado para acessar esta página.
           </p>
           <Link
-            href="/acesso-geral"
+            href="/acesso-geral?redirect=/systems"
             className="mt-6 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
           >
             Ir para Login
