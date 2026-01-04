@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { hashPassword } from "@/lib/password";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,10 +11,7 @@ import { Loader2, Lock, ShieldCheck } from "lucide-react";
 
 type ZUser = Database["public"]["Tables"]["z_usuarios"]["Row"];
 export default function AccessResetPage() {
-  const supabase = useMemo(
-    () => createSupabaseBrowserClient() as SupabaseClient<Database>,
-    []
-  );
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<ZUser | null>(null);
@@ -35,7 +31,6 @@ export default function AccessResetPage() {
       const { data } = await supabase.auth.getUser();
       const email = data.user?.email ?? "";
 
-      if (!email) {
       if (!email) {
         setError("Link inválido ou expirado. Solicite um novo link.");
         setLoading(false);
@@ -98,7 +93,7 @@ export default function AccessResetPage() {
       const hashed = await hashPassword(password);
       const { error: updateError } = await supabase
         .from("z_usuarios")
-        .update({ senha_hash: hashed } as Partial<ZUser>)
+        .update({ senha_hash: hashed })
         .eq("id", profile.id);
 
       if (updateError) throw updateError;

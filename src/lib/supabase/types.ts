@@ -1160,3 +1160,33 @@ export type Database = {
     };
   };
 };
+
+type TablesWithRelationships<T> = {
+  [K in keyof T]: T[K] extends { Row: unknown }
+    ? T[K] & { Relationships: [] }
+    : T[K];
+};
+
+type ViewsWithRelationships<T> = {
+  [K in keyof T]: T[K] extends { Row: unknown }
+    ? T[K] & { Relationships: [] }
+    : T[K];
+};
+
+export type DatabaseWithRelationships = {
+  [SchemaName in keyof Database]: Database[SchemaName] extends {
+    Tables: infer Tables;
+    Views: infer Views;
+    Functions: infer Functions;
+    Enums: infer Enums;
+    CompositeTypes: infer CompositeTypes;
+  }
+    ? {
+        Tables: TablesWithRelationships<Tables>;
+        Views: ViewsWithRelationships<Views>;
+        Functions: Functions;
+        Enums: Enums;
+        CompositeTypes: CompositeTypes;
+      }
+    : Database[SchemaName];
+};

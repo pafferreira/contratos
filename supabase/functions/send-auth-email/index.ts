@@ -130,7 +130,22 @@ serve(async (req) => {
     const baseOrigin = new URL(siteUrl).origin;
     const finalRedirect = normalizeRedirect(redirectTo, baseOrigin);
 
-    const supabase = createClient(supabaseUrl, serviceKey);
+        // Minimal local Database type so createClient can be typed in this edge function.
+        // We keep a very small, permissive shape because this function only uses
+        // the Auth admin API and doesn't interact with Postgres tables here.
+        type Database = {
+          public: {
+            Tables: {
+              [key: string]: {
+                Row: Record<string, unknown>;
+                Insert: Record<string, unknown>;
+                Update: Record<string, unknown>;
+              };
+            };
+          };
+        };
+
+        const supabase = createClient<Database>(supabaseUrl, serviceKey);
     const { data, error } = await supabase.auth.admin.generateLink({
       type: "magiclink",
       email,

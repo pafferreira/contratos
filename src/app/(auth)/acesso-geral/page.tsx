@@ -398,7 +398,7 @@ export default function AccessGeneralPage() {
                       required
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
-                      className="w-full rounded-lg border border-neutral-200 bg-white py-2 px-10 text-sm text-neutral-800 shadow-sm outline-none transition hocus:border-brand-500"
+                      className="w-full rounded-lg border border-neutral-200 bg-white px-10 py-2 text-sm text-neutral-800 shadow-sm outline-none transition hocus:border-brand-500"
                       placeholder="Digite sua senha"
                     />
                     <button
