@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSupabase } from "@/components/providers/supabase-provider";
 import type { Database } from "@/lib/supabase/types";
 import {
     LayoutGrid,
@@ -31,7 +30,6 @@ type ZRole = Database["public"]["Tables"]["z_papeis"]["Row"];
 type ZUserRole = Database["public"]["Tables"]["z_usuarios_papeis"]["Row"];
 
 export function AccessControlClient() {
-    const { supabase } = useSupabase();
     const [activeTab, setActiveTab] = useState("users");
 
     // Data State
@@ -48,29 +46,22 @@ export function AccessControlClient() {
         setLoading(true);
         setError(null);
         try {
-            const [usersRes, systemsRes, rolesRes, userRolesRes] = await Promise.all([
-                supabase.from("z_usuarios").select("*").order("nome_completo"),
-                supabase.from("z_sistemas").select("*").order("nome"),
-                supabase.from("z_papeis").select("*").order("nome"),
-                supabase.from("z_usuarios_papeis").select("*")
-            ]);
-
-            if (usersRes.error) throw usersRes.error;
-            if (systemsRes.error) throw systemsRes.error;
-            if (rolesRes.error) throw rolesRes.error;
-            if (userRolesRes.error) throw userRolesRes.error;
-
-            setUsers(usersRes.data);
-            setSystems(systemsRes.data);
-            setRoles(rolesRes.data);
-            setUserRoles(userRolesRes.data);
+            const response = await fetch("/api/access/data", { cache: "no-store" });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload?.error || "Erro ao carregar dados.");
+            }
+            setUsers(payload?.users ?? []);
+            setSystems(payload?.systems ?? []);
+            setRoles(payload?.roles ?? []);
+            setUserRoles(payload?.userRoles ?? []);
         } catch (err: any) {
             console.error("Error loading data:", err);
             setError(err.message || "Erro ao carregar dados.");
         } finally {
             setLoading(false);
         }
-    }, [supabase]);
+    }, []);
 
     useEffect(() => {
         loadData();
@@ -120,7 +111,6 @@ export function AccessControlClient() {
                         roles={roles}
                         userRoles={userRoles}
                         onRefresh={loadData}
-                        supabase={supabase}
                     />
                 </TabsContent>
 
@@ -129,7 +119,6 @@ export function AccessControlClient() {
                         systems={systems}
                         userRoles={userRoles}
                         onRefresh={loadData}
-                        supabase={supabase}
                     />
                 </TabsContent>
 
@@ -140,7 +129,6 @@ export function AccessControlClient() {
                         userRoles={userRoles}
                         systems={systems}
                         onRefresh={loadData}
-                        supabase={supabase}
                     />
                 </TabsContent>
             </Tabs>
@@ -152,7 +140,7 @@ export function AccessControlClient() {
 
 // --- Users Tab Component ---
 
-function UsersTab({ users, systems, roles, userRoles, onRefresh, supabase }: any) {
+function UsersTab({ users, systems, roles, userRoles, onRefresh }: any) {
     const [search, setSearch] = useState("");
     const [viewMode, setViewMode] = useState<"cards" | "list">("list");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -176,12 +164,17 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh, supabase }: any
     const handleSave = async () => {
         setSaving(true);
         try {
-            if (editingUser) {
-                const { error } = await supabase.from("z_usuarios").update(formData).eq("id", editingUser.id);
-                if (error) throw error;
-            } else {
-                const { error } = await supabase.from("z_usuarios").insert(formData);
-                if (error) throw error;
+            const response = await fetch("/api/access/users", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    ...formData,
+                    id: editingUser?.id
+                })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload?.error || "Erro ao salvar usuário.");
             }
             setIsDialogOpen(false);
             onRefresh();
@@ -200,8 +193,15 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh, supabase }: any
     const handleDelete = async () => {
         if (!pendingDelete) return;
         try {
-            const { error } = await supabase.from("z_usuarios").delete().eq("id", pendingDelete.id);
-            if (error) throw error;
+            const response = await fetch("/api/access/users", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: pendingDelete.id })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload?.error || "Erro ao excluir usuário.");
+            }
             onRefresh();
             setDeleteOpen(false);
             setPendingDelete(null);
@@ -442,7 +442,6 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh, supabase }: any
                     roles={roles}
                     userRoles={userRoles}
                     onRefresh={onRefresh}
-                    supabase={supabase}
                 />
             )}
         </>
@@ -451,7 +450,7 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh, supabase }: any
 
 // --- User Roles Dialog ---
 
-function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onRefresh, supabase }: any) {
+function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onRefresh }: any) {
     const [saving, setSaving] = useState(false);
     const hasRoles = roles.length > 0;
 
@@ -471,15 +470,19 @@ function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onR
     const handleToggleRole = async (roleId: string, systemId: string, checked: boolean) => {
         setSaving(true);
         try {
-            if (checked) {
-                await supabase
-                    .from("z_usuarios_papeis")
-                    .insert({ usuario_id: user.id, papel_id: roleId, sistema_id: systemId });
-            } else {
-                await supabase
-                    .from("z_usuarios_papeis")
-                    .delete()
-                    .match({ usuario_id: user.id, papel_id: roleId, sistema_id: systemId });
+            const response = await fetch("/api/access/user-roles", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: checked ? "add" : "remove",
+                    usuario_id: user.id,
+                    papel_id: roleId,
+                    sistema_id: systemId
+                })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload?.error || "Erro ao atualizar papel.");
             }
             onRefresh();
         } catch (err: any) {
@@ -559,7 +562,7 @@ function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onR
 
 // --- Systems Tab Component ---
 
-function SystemsTab({ systems, userRoles, onRefresh, supabase }: any) {
+function SystemsTab({ systems, userRoles, onRefresh }: any) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingSystem, setEditingSystem] = useState<ZSystem | null>(null);
     const [formData, setFormData] = useState<Partial<ZSystem>>({ nome: "", descricao: "", ativo: true });
@@ -580,12 +583,17 @@ function SystemsTab({ systems, userRoles, onRefresh, supabase }: any) {
     const handleSave = async () => {
         setSaving(true);
         try {
-            if (editingSystem) {
-                const { error } = await supabase.from("z_sistemas").update(formData).eq("id", editingSystem.id);
-                if (error) throw error;
-            } else {
-                const { error } = await supabase.from("z_sistemas").insert(formData);
-                if (error) throw error;
+            const response = await fetch("/api/access/systems", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    ...formData,
+                    id: editingSystem?.id
+                })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload?.error || "Erro ao salvar sistema.");
             }
             setIsDialogOpen(false);
             onRefresh();
@@ -604,8 +612,15 @@ function SystemsTab({ systems, userRoles, onRefresh, supabase }: any) {
     const handleDelete = async () => {
         if (!pendingDelete) return;
         try {
-            const { error } = await supabase.from("z_sistemas").delete().eq("id", pendingDelete.id);
-            if (error) throw error;
+            const response = await fetch("/api/access/systems", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: pendingDelete.id })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload?.error || "Erro ao excluir sistema.");
+            }
             onRefresh();
             setDeleteOpen(false);
             setPendingDelete(null);
@@ -747,7 +762,7 @@ function SystemsTab({ systems, userRoles, onRefresh, supabase }: any) {
 
 // --- Roles Tab Component ---
 
-function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any) {
+function RolesTab({ roles, users, userRoles, systems, onRefresh }: any) {
     const [search, setSearch] = useState("");
     const [viewMode, setViewMode] = useState<"cards" | "list">("list");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -785,7 +800,26 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
     }, [systems]);
 
     const filteredRoles = roles.filter((r: ZRole) => {
-        return r.nome.toLowerCase().includes(search.toLowerCase());
+        const searchValue = search.toLowerCase();
+        if (!searchValue) return true;
+
+        if (r.nome.toLowerCase().includes(searchValue)) return true;
+
+        const systemMatches = systems.some((system: ZSystem) => {
+            if (!system.nome.toLowerCase().includes(searchValue)) return false;
+            const key = `${r.id}::${system.id}`;
+            return (usersByRole.get(key) ?? []).length > 0;
+        });
+        if (systemMatches) return true;
+
+        const hasUserMatch = systems.some((system: ZSystem) => {
+            const key = `${r.id}::${system.id}`;
+            return (usersByRole.get(key) ?? []).some((name) =>
+                name.toLowerCase().includes(searchValue)
+            );
+        });
+
+        return hasUserMatch;
     });
 
     const handleSave = async () => {
@@ -798,14 +832,25 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
                 return;
             }
             if (editingRole) {
-                const { error } = await supabase
-                    .from("z_papeis")
-                    .update(payload)
-                    .eq("id", editingRole.id);
-                if (error) throw error;
+                const response = await fetch("/api/access/roles", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ...payload, id: editingRole.id })
+                });
+                const responseBody = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(responseBody?.error || "Erro ao salvar papel.");
+                }
             } else {
-                const { error } = await supabase.from("z_papeis").insert(payload);
-                if (error) throw error;
+                const response = await fetch("/api/access/roles", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const responseBody = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(responseBody?.error || "Erro ao salvar papel.");
+                }
             }
             setIsDialogOpen(false);
             onRefresh();
@@ -824,8 +869,15 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
     const handleDelete = async () => {
         if (!pendingDelete) return;
         try {
-            const { error } = await supabase.from("z_papeis").delete().eq("id", pendingDelete.id);
-            if (error) throw error;
+            const response = await fetch("/api/access/roles", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: pendingDelete.id })
+            });
+            const responseBody = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(responseBody?.error || "Erro ao excluir papel.");
+            }
             onRefresh();
             setDeleteOpen(false);
             setPendingDelete(null);
@@ -1059,7 +1111,6 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
                     isOpen={isRoleUsersOpen}
                     onClose={() => setIsRoleUsersOpen(false)}
                     onRefresh={onRefresh}
-                    supabase={supabase}
                 />
             )}
 
@@ -1108,7 +1159,7 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
 
 // --- Role Users Dialog ---
 
-function RoleUsersDialog({ role, users, systems, userRoles, isOpen, onClose, onRefresh, supabase }: any) {
+function RoleUsersDialog({ role, users, systems, userRoles, isOpen, onClose, onRefresh }: any) {
     const [saving, setSaving] = useState(false);
     const [selectedSystemId, setSelectedSystemId] = useState<string>(systems[0]?.id ?? "");
 
@@ -1127,15 +1178,19 @@ function RoleUsersDialog({ role, users, systems, userRoles, isOpen, onClose, onR
     const handleToggleUser = async (userId: string, checked: boolean) => {
         setSaving(true);
         try {
-            if (checked) {
-                await supabase
-                    .from("z_usuarios_papeis")
-                    .insert({ usuario_id: userId, papel_id: role.id, sistema_id: selectedSystemId });
-            } else {
-                await supabase
-                    .from("z_usuarios_papeis")
-                    .delete()
-                    .match({ usuario_id: userId, papel_id: role.id, sistema_id: selectedSystemId });
+            const response = await fetch("/api/access/user-roles", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: checked ? "add" : "remove",
+                    usuario_id: userId,
+                    papel_id: role.id,
+                    sistema_id: selectedSystemId
+                })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload?.error || "Erro ao atualizar vínculo.");
             }
             onRefresh();
         } catch (err: any) {

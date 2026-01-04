@@ -65,26 +65,21 @@ export function AccessAdminClient() {
     setLoading(true);
     setError(null);
     try {
-      const [usersRes, userRolesRes, systemsRes] = await Promise.all([
-        supabase.from("z_usuarios").select("*").order("nome_completo"),
-        supabase.from("z_usuarios_papeis").select("*"),
-        supabase.from("z_sistemas").select("id, nome, ativo").order("nome")
-      ]);
-
-      if (usersRes.error) throw usersRes.error;
-      if (userRolesRes.error) throw userRolesRes.error;
-      if (systemsRes.error) throw systemsRes.error;
-
-      setUsers(usersRes.data ?? []);
-      setUserRoles(userRolesRes.data ?? []);
-      setSystems(systemsRes.data ?? []);
+      const response = await fetch("/api/access/data", { cache: "no-store" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || "Erro ao carregar dados.");
+      }
+      setUsers(payload?.users ?? []);
+      setUserRoles(payload?.userRoles ?? []);
+      setSystems(payload?.systems ?? []);
     } catch (err: any) {
       console.error("Erro ao carregar dados:", err);
       setError(err.message || "Erro ao carregar dados.");
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -173,12 +168,17 @@ export function AccessAdminClient() {
         payload.senha_hash = await hashPassword(passwordValue);
       }
 
-      if (editingUser) {
-        const { error } = await supabase.from("z_usuarios").update(payload).eq("id", editingUser.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("z_usuarios").insert(payload);
-        if (error) throw error;
+      const response = await fetch("/api/access/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...payload,
+          id: editingUser?.id
+        })
+      });
+      const responseBody = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(responseBody?.error || "Erro ao salvar usuário.");
       }
 
       setIsDialogOpen(false);
@@ -199,8 +199,15 @@ export function AccessAdminClient() {
   const handleDelete = async () => {
     if (!pendingDelete) return;
     try {
-      const { error } = await supabase.from("z_usuarios").delete().eq("id", pendingDelete.id);
-      if (error) throw error;
+      const response = await fetch("/api/access/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: pendingDelete.id })
+      });
+      const responseBody = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(responseBody?.error || "Erro ao excluir usuário.");
+      }
       setDeleteOpen(false);
       setPendingDelete(null);
       await loadData();

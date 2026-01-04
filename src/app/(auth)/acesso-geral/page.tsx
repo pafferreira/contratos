@@ -27,7 +27,7 @@ export default function AccessGeneralPage() {
     let isMounted = true;
     const loadUsers = async () => {
       setLoadingUsers(true);
-      const response = await fetch("/api/auth/users");
+      const response = await fetch("/api/auth/users", { cache: "no-store" });
       const payload = await response.json().catch(() => ({}));
       if (!isMounted) return;
       if (!response.ok) {

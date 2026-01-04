@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
   const serviceRoleKey =
