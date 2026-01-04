@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 type ZUser = Database["public"]["Tables"]["z_usuarios"]["Row"];
+type ZUserInsert = Database["public"]["Tables"]["z_usuarios"]["Insert"];
 type ZUserRole = Database["public"]["Tables"]["z_usuarios_papeis"]["Row"];
 type ZSystem = Database["public"]["Tables"]["z_sistemas"]["Row"];
 
@@ -45,7 +46,7 @@ export function AccessAdminClient() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<ZUser | null>(null);
-  const [formData, setFormData] = useState<Partial<ZUser>>({
+  const [formData, setFormData] = useState<ZUserInsert>({
     nome_completo: "",
     email: "",
     ativo: true
@@ -161,7 +162,7 @@ export function AccessAdminClient() {
         return;
       }
 
-      const payload: Partial<ZUser> = {
+      const payload: ZUserInsert = {
         nome_completo: formData.nome_completo ?? "",
         email: formData.email,
         ativo: formData.ativo ?? true

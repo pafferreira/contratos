@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Loader2, Lock, ShieldCheck } from "lucide-react";
 
 type ZUser = Database["public"]["Tables"]["z_usuarios"]["Row"];
+type ZUserUpdate = Database["public"]["Tables"]["z_usuarios"]["Update"];
 export default function AccessResetPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [loading, setLoading] = useState(true);
@@ -91,9 +92,10 @@ export default function AccessResetPage() {
     setSaving(true);
     try {
       const hashed = await hashPassword(password);
+      const payload: ZUserUpdate = { senha_hash: hashed };
       const { error: updateError } = await supabase
         .from("z_usuarios")
-        .update({ senha_hash: hashed })
+        .update(payload)
         .eq("id", profile.id);
 
       if (updateError) throw updateError;

@@ -25,6 +25,7 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 import { cn } from "@/lib/utils";
 
 type ZUser = Database["public"]["Tables"]["z_usuarios"]["Row"];
+type ZUserInsert = Database["public"]["Tables"]["z_usuarios"]["Insert"];
 type ZSystem = Database["public"]["Tables"]["z_sistemas"]["Row"];
 type ZRole = Database["public"]["Tables"]["z_papeis"]["Row"];
 type ZUserRole = Database["public"]["Tables"]["z_usuarios_papeis"]["Row"];
@@ -155,7 +156,7 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh, supabase }: any
     const [viewMode, setViewMode] = useState<"cards" | "list">("list");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<ZUser | null>(null);
-    const [formData, setFormData] = useState<Partial<ZUser>>({ nome_completo: "", email: "", ativo: true });
+    const [formData, setFormData] = useState<ZUserInsert>({ nome_completo: "", email: "", ativo: true });
     const [saving, setSaving] = useState(false);
 
     // Delete Dialog State

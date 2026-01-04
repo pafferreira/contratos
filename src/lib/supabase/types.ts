@@ -20,7 +20,7 @@ export type TablesUpdate<T> = T extends { Row: infer R; Update: infer U }
 
 export type TablesRow<T> = T extends { Row: infer R } ? R : never;
 
-export type Database = {
+export type DatabaseGenerated = {
   public: {
     Tables: {
       "C_ALOCACOES_RECURSOS": {
@@ -1162,19 +1162,35 @@ export type Database = {
 };
 
 type TablesWithRelationships<T> = {
-  [K in keyof T]: T[K] extends { Row: unknown }
+  [K in keyof T]: T[K] extends { Row: unknown; Insert: unknown; Update: unknown }
     ? T[K] & { Relationships: [] }
     : T[K];
-};
+} & Record<
+  string,
+  {
+    Row: Record<string, unknown>;
+    Insert: Record<string, unknown>;
+    Update: Record<string, unknown>;
+    Relationships: [];
+  }
+>;
 
 type ViewsWithRelationships<T> = {
   [K in keyof T]: T[K] extends { Row: unknown }
     ? T[K] & { Relationships: [] }
     : T[K];
-};
+} & Record<
+  string,
+  {
+    Row: Record<string, unknown>;
+    Insert: Record<string, unknown>;
+    Update: Record<string, unknown>;
+    Relationships: [];
+  }
+>;
 
 export type DatabaseWithRelationships = {
-  [SchemaName in keyof Database]: Database[SchemaName] extends {
+  [SchemaName in keyof DatabaseGenerated]: DatabaseGenerated[SchemaName] extends {
     Tables: infer Tables;
     Views: infer Views;
     Functions: infer Functions;
@@ -1184,9 +1200,18 @@ export type DatabaseWithRelationships = {
     ? {
         Tables: TablesWithRelationships<Tables>;
         Views: ViewsWithRelationships<Views>;
-        Functions: Functions;
+        Functions: Functions &
+          Record<
+            string,
+            {
+              Args: Record<string, unknown>;
+              Returns: unknown;
+            }
+          >;
         Enums: Enums;
         CompositeTypes: CompositeTypes;
       }
-    : Database[SchemaName];
+    : DatabaseGenerated[SchemaName];
 };
+
+export type Database = DatabaseWithRelationships;

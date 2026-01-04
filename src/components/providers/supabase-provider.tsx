@@ -3,10 +3,10 @@
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { createContext, useContext, useMemo } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { DatabaseWithRelationships } from "@/lib/supabase/types";
+import type { Database } from "@/lib/supabase/types";
 
 type SupabaseContext = {
-  supabase: SupabaseClient<DatabaseWithRelationships>;
+  supabase: SupabaseClient<Database>;
 };
 
 const Context = createContext<SupabaseContext | undefined>(undefined);
