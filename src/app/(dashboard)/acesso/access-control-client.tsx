@@ -127,6 +127,7 @@ export function AccessControlClient() {
                 <TabsContent value="systems" className="mt-6 space-y-4">
                     <SystemsTab
                         systems={systems}
+                        userRoles={userRoles}
                         onRefresh={loadData}
                         supabase={supabase}
                     />
@@ -452,12 +453,14 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh, supabase }: any
 
 function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onRefresh, supabase }: any) {
     const [saving, setSaving] = useState(false);
+    const hasRoles = roles.length > 0;
 
     // Group roles by system
     const rolesBySystem = useMemo(() => {
-        const grouped: any = {};
+        const grouped: Record<string, ZRole[]> = {};
+        const sortedRoles = [...roles].sort((a, b) => a.nome.localeCompare(b.nome));
         systems.forEach((sys: ZSystem) => {
-            grouped[sys.id] = roles.filter((r: ZRole) => r.sistema_id === sys.id);
+            grouped[sys.id] = sortedRoles;
         });
         return grouped;
     }, [systems, roles]);
@@ -465,13 +468,18 @@ function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onR
     // Current user roles
     const currentUserRoles = userRoles.filter((ur: ZUserRole) => ur.usuario_id === user.id);
 
-    const handleToggleRole = async (roleId: string, checked: boolean) => {
+    const handleToggleRole = async (roleId: string, systemId: string, checked: boolean) => {
         setSaving(true);
         try {
             if (checked) {
-                await supabase.from("z_usuarios_papeis").insert({ usuario_id: user.id, papel_id: roleId });
+                await supabase
+                    .from("z_usuarios_papeis")
+                    .insert({ usuario_id: user.id, papel_id: roleId, sistema_id: systemId });
             } else {
-                await supabase.from("z_usuarios_papeis").delete().match({ usuario_id: user.id, papel_id: roleId });
+                await supabase
+                    .from("z_usuarios_papeis")
+                    .delete()
+                    .match({ usuario_id: user.id, papel_id: roleId, sistema_id: systemId });
             }
             onRefresh();
         } catch (err: any) {
@@ -493,39 +501,50 @@ function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onR
                         Gerencie os papeis atribuídos a este usuário em cada sistema.
                     </Dialog.Description>
 
-                    <div className="space-y-6">
-                        {systems.map((sys: ZSystem) => {
-                            const sysRoles = rolesBySystem[sys.id] || [];
-                            if (sysRoles.length === 0) return null;
+                    {!hasRoles ? (
+                        <div className="rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm text-neutral-700">
+                            Nenhum papel cadastrado. Crie papéis antes de atribuir acessos por sistema.
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {systems.map((sys: ZSystem) => {
+                                const sysRoles = rolesBySystem[sys.id] || [];
+                                if (sysRoles.length === 0) return null;
 
-                            return (
-                                <div key={sys.id} className="rounded-lg border p-4">
-                                    <h4 className="mb-3 flex items-center gap-2 font-semibold text-neutral-900">
-                                        <Monitor className="size-4 text-neutral-500" />
-                                        {sys.nome}
-                                    </h4>
-                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                        {sysRoles.map((role: ZRole) => {
-                                            const hasRole = currentUserRoles.some((ur: ZUserRole) => ur.papel_id === role.id);
-                                            return (
-                                                <label key={role.id} className="flex cursor-pointer items-center gap-2 rounded p-2 text-sm hover:bg-neutral-50">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={hasRole}
-                                                        onChange={(e) => handleToggleRole(role.id, e.target.checked)}
-                                                        disabled={saving}
-                                                        className="rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
-                                                    />
-                                                    <span>{role.nome}</span>
-                                                </label>
-                                            );
-                                        })}
+                                return (
+                                    <div key={sys.id} className="rounded-lg border p-4">
+                                        <h4 className="mb-3 flex items-center gap-2 font-semibold text-neutral-900">
+                                            <Monitor className="size-4 text-neutral-500" />
+                                            {sys.nome}
+                                        </h4>
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            {sysRoles.map((role: ZRole) => {
+                                                const hasRole = currentUserRoles.some(
+                                                    (ur: ZUserRole) =>
+                                                        ur.papel_id === role.id && ur.sistema_id === sys.id
+                                                );
+                                                return (
+                                                    <label key={role.id} className="flex cursor-pointer items-center gap-2 rounded p-2 text-sm hover:bg-neutral-50">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={hasRole}
+                                                            onChange={(e) => handleToggleRole(role.id, sys.id, e.target.checked)}
+                                                            disabled={saving}
+                                                            className="rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
+                                                        />
+                                                        <span>{role.nome}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                        {systems.length === 0 && <p className="text-center text-neutral-500">Nenhum sistema cadastrado.</p>}
-                    </div>
+                                );
+                            })}
+                            {systems.length === 0 && (
+                                <p className="text-center text-neutral-500">Nenhum sistema cadastrado.</p>
+                            )}
+                        </div>
+                    )}
 
                     <div className="mt-6 flex justify-end">
                         <Button onClick={onClose}>Fechar</Button>
@@ -540,7 +559,7 @@ function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onR
 
 // --- Systems Tab Component ---
 
-function SystemsTab({ systems, onRefresh, supabase }: any) {
+function SystemsTab({ systems, userRoles, onRefresh, supabase }: any) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingSystem, setEditingSystem] = useState<ZSystem | null>(null);
     const [formData, setFormData] = useState<Partial<ZSystem>>({ nome: "", descricao: "", ativo: true });
@@ -548,6 +567,15 @@ function SystemsTab({ systems, onRefresh, supabase }: any) {
 
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [pendingDelete, setPendingDelete] = useState<ZSystem | null>(null);
+
+    const rolesBySystem = useMemo(() => {
+        const map = new Map<string, number>();
+        (userRoles as ZUserRole[]).forEach((entry) => {
+            if (!entry.sistema_id) return;
+            map.set(entry.sistema_id, (map.get(entry.sistema_id) ?? 0) + 1);
+        });
+        return map;
+    }, [userRoles]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -617,6 +645,11 @@ function SystemsTab({ systems, onRefresh, supabase }: any) {
                             </div>
                         </div>
                         <p className="mt-2 text-sm text-neutral-500">{sys.descricao || "Sem descrição"}</p>
+                        {(rolesBySystem.get(sys.id) ?? 0) === 0 && (
+                            <p className="mt-2 text-xs font-semibold text-warning">
+                                Nenhum papel atribuído para este sistema.
+                            </p>
+                        )}
                         <div className="mt-4 flex items-center gap-2">
                             <span className={cn("inline-flex h-2 w-2 rounded-full", sys.ativo ? "bg-green-500" : "bg-neutral-300")} />
                             <span className="text-xs text-neutral-500">{sys.ativo ? "Ativo" : "Inativo"}</span>
@@ -719,15 +752,13 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
     const [viewMode, setViewMode] = useState<"cards" | "list">("list");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingRole, setEditingRole] = useState<ZRole | null>(null);
-    const [formData, setFormData] = useState<Partial<ZRole>>({ nome: "Usuario", descricao: "", sistema_id: "" });
+    const [formData, setFormData] = useState<Partial<ZRole>>({ nome: "" });
     const [saving, setSaving] = useState(false);
 
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [pendingDelete, setPendingDelete] = useState<ZRole | null>(null);
     const [isRoleUsersOpen, setIsRoleUsersOpen] = useState(false);
     const [selectedRoleForUsers, setSelectedRoleForUsers] = useState<ZRole | null>(null);
-
-    const getSystemName = (id: string) => systems.find((s: ZSystem) => s.id === id)?.nome || "Desconhecido";
 
     const usersByRole = useMemo(() => {
         const map = new Map<string, string[]>();
@@ -745,13 +776,7 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
     }, [userRoles, users]);
 
     const filteredRoles = roles.filter((r: ZRole) => {
-        const searchValue = search.toLowerCase();
-        const systemName = getSystemName(r.sistema_id || "").toLowerCase();
-        return (
-            r.nome.toLowerCase().includes(searchValue) ||
-            r.descricao?.toLowerCase().includes(searchValue) ||
-            systemName.includes(searchValue)
-        );
+        return r.nome.toLowerCase().includes(search.toLowerCase());
     });
 
     const handleSave = async () => {
@@ -793,7 +818,7 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
 
     const handleCreateRole = () => {
         setEditingRole(null);
-        setFormData({ sistema_id: systems[0]?.id || "", nome: "Usuario" });
+        setFormData({ nome: "" });
         setIsDialogOpen(true);
     };
 
@@ -857,9 +882,6 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
                                         <Shield className="size-4 text-brand-600" />
                                         <h3 className="font-semibold text-neutral-900">{role.nome}</h3>
                                     </div>
-                                    <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
-                                        {getSystemName(role.sistema_id!)}
-                                    </span>
                                 </div>
                                 <div className="flex gap-1">
                                     <ActionTooltip label="Editar">
@@ -879,7 +901,9 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
                                     </ActionTooltip>
                                 </div>
                             </div>
-                            <p className="mt-3 line-clamp-2 text-sm text-neutral-500">{role.descricao || "Sem descrição"}</p>
+                            <p className="mt-3 text-xs text-neutral-500">
+                                {(usersByRole.get(role.id) ?? []).length} usuário(s) com este papel.
+                            </p>
                         </Card>
                     ))}
                 </div>
@@ -889,8 +913,6 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
                         <thead className="bg-neutral-50 text-neutral-500">
                             <tr>
                                 <th className="p-3 text-left font-medium">Papel</th>
-                                <th className="p-3 text-left font-medium">Sistema</th>
-                                <th className="p-3 text-left font-medium">Descrição</th>
                                 <th className="p-3 text-left font-medium">Usuários</th>
                                 <th className="p-3 text-right font-medium">Ações</th>
                             </tr>
@@ -899,12 +921,6 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
                             {filteredRoles.map((role: ZRole) => (
                                 <tr key={role.id} className="hover:bg-neutral-50">
                                     <td className="p-3 font-medium text-neutral-900">{role.nome}</td>
-                                    <td className="p-3">
-                                        <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-600">
-                                            {getSystemName(role.sistema_id!)}
-                                        </span>
-                                    </td>
-                                    <td className="p-3 text-neutral-500">{role.descricao}</td>
                                     <td className="p-3 text-neutral-500">
                                         {(usersByRole.get(role.id) ?? []).join(", ") || "—"}
                                     </td>
@@ -931,7 +947,7 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
                             ))}
                             {filteredRoles.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="p-4 text-center text-neutral-500">Nenhum papel encontrado.</td>
+                                    <td colSpan={3} className="p-4 text-center text-neutral-500">Nenhum papel encontrado.</td>
                                 </tr>
                             )}
                         </tbody>
@@ -948,36 +964,11 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
                         </Dialog.Title>
                         <div className="mt-4 space-y-4">
                             <div>
-                                <label className="text-sm font-medium">Sistema</label>
-                                <select
-                                    className="w-full rounded-md border bg-white p-2 text-sm"
-                                    value={formData.sistema_id || ""}
-                                    onChange={e => setFormData({ ...formData, sistema_id: e.target.value })}
-                                >
-                                    <option value="" disabled>Selecione um sistema</option>
-                                    {systems.map((sys: ZSystem) => (
-                                        <option key={sys.id} value={sys.id}>{sys.nome}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
                                 <label className="text-sm font-medium">Nome do Papel</label>
-                                <select
-                                    className="w-full rounded-md border bg-white p-2 text-sm"
-                                    value={formData.nome || "Usuario"}
-                                    onChange={e => setFormData({ ...formData, nome: e.target.value })}
-                                >
-                                    <option value="Admin">Admin</option>
-                                    <option value="Coordenador">Coordenador</option>
-                                    <option value="Usuario">Usuario</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium">Descrição</label>
-                                <textarea
+                                <input
                                     className="w-full rounded-md border p-2 text-sm"
-                                    value={formData.descricao || ""}
-                                    onChange={e => setFormData({ ...formData, descricao: e.target.value })}
+                                    value={formData.nome || ""}
+                                    onChange={e => setFormData({ ...formData, nome: e.target.value })}
                                 />
                             </div>
                         </div>
@@ -1023,7 +1014,7 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
                         <Dialog.Description className="mt-1 text-sm text-neutral-500">
                             Confirma a exclusão do papel?
                             <div className="mt-2 font-semibold text-neutral-800">
-                                {pendingDelete?.nome} - {getSystemName(pendingDelete?.sistema_id!)}
+                                {pendingDelete?.nome}
                             </div>
                             <p className="mt-2">Essa ação não pode ser desfeita.</p>
                         </Dialog.Description>
@@ -1052,18 +1043,32 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh, supabase }: any
 
 function RoleUsersDialog({ role, users, systems, userRoles, isOpen, onClose, onRefresh, supabase }: any) {
     const [saving, setSaving] = useState(false);
+    const [selectedSystemId, setSelectedSystemId] = useState<string>(systems[0]?.id ?? "");
 
-    const currentRoleUsers = userRoles.filter((ur: ZUserRole) => ur.papel_id === role.id);
+    useEffect(() => {
+        if (!selectedSystemId && systems[0]?.id) {
+            setSelectedSystemId(systems[0].id);
+        }
+    }, [selectedSystemId, systems]);
+
+    const currentRoleUsers = userRoles.filter(
+        (ur: ZUserRole) => ur.papel_id === role.id && ur.sistema_id === selectedSystemId
+    );
     const currentUserIds = new Set(currentRoleUsers.map((ur: ZUserRole) => ur.usuario_id));
-    const systemName = systems.find((sys: ZSystem) => sys.id === role.sistema_id)?.nome || "Desconhecido";
+    const systemName = systems.find((sys: ZSystem) => sys.id === selectedSystemId)?.nome || "Selecione um sistema";
 
     const handleToggleUser = async (userId: string, checked: boolean) => {
         setSaving(true);
         try {
             if (checked) {
-                await supabase.from("z_usuarios_papeis").insert({ usuario_id: userId, papel_id: role.id });
+                await supabase
+                    .from("z_usuarios_papeis")
+                    .insert({ usuario_id: userId, papel_id: role.id, sistema_id: selectedSystemId });
             } else {
-                await supabase.from("z_usuarios_papeis").delete().match({ usuario_id: userId, papel_id: role.id });
+                await supabase
+                    .from("z_usuarios_papeis")
+                    .delete()
+                    .match({ usuario_id: userId, papel_id: role.id, sistema_id: selectedSystemId });
             }
             onRefresh();
         } catch (err: any) {
@@ -1090,26 +1095,48 @@ function RoleUsersDialog({ role, users, systems, userRoles, isOpen, onClose, onR
                     </Dialog.Description>
 
                     <div className="space-y-3">
-                        {sortedUsers.map((user: ZUser) => {
-                            const isChecked = currentUserIds.has(user.id);
-                            return (
-                                <label key={user.id} className="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-neutral-100 px-3 py-2 text-sm hover:bg-neutral-50">
-                                    <div>
-                                        <div className="font-medium text-neutral-900">{user.nome_completo || "Sem nome"}</div>
-                                        <div className="text-neutral-500">{user.email}</div>
-                                    </div>
-                                    <input
-                                        type="checkbox"
-                                        checked={isChecked}
-                                        onChange={(e) => handleToggleUser(user.id, e.target.checked)}
-                                        disabled={saving}
-                                        className="rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
-                                    />
-                                </label>
-                            );
-                        })}
-                        {sortedUsers.length === 0 && (
-                            <p className="text-center text-neutral-500">Nenhum usuário cadastrado.</p>
+                        <div className="grid gap-2">
+                            <label className="text-xs font-semibold text-neutral-500">Sistema</label>
+                            <select
+                                className="w-full rounded-md border bg-white p-2 text-sm"
+                                value={selectedSystemId}
+                                onChange={(e) => setSelectedSystemId(e.target.value)}
+                            >
+                                <option value="" disabled>Selecione um sistema</option>
+                                {systems.map((sys: ZSystem) => (
+                                    <option key={sys.id} value={sys.id}>
+                                        {sys.nome}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {selectedSystemId ? (
+                            <>
+                                {sortedUsers.map((user: ZUser) => {
+                                    const isChecked = currentUserIds.has(user.id);
+                                    return (
+                                        <label key={user.id} className="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-neutral-100 px-3 py-2 text-sm hover:bg-neutral-50">
+                                            <div>
+                                                <div className="font-medium text-neutral-900">{user.nome_completo || "Sem nome"}</div>
+                                                <div className="text-neutral-500">{user.email}</div>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={(e) => handleToggleUser(user.id, e.target.checked)}
+                                                disabled={saving}
+                                                className="rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
+                                            />
+                                        </label>
+                                    );
+                                })}
+                                {sortedUsers.length === 0 && (
+                                    <p className="text-center text-neutral-500">Nenhum usuário cadastrado.</p>
+                                )}
+                            </>
+                        ) : (
+                            <p className="text-sm text-neutral-500">Selecione um sistema para gerenciar os usuários.</p>
                         )}
                     </div>
 

@@ -20,7 +20,7 @@ export default async function SystemsPage() {
             Você precisa estar logado para acessar esta página.
           </p>
           <Link
-            href="/signin"
+            href="/acesso-geral"
             className="mt-6 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
           >
             Ir para Login
@@ -32,7 +32,7 @@ export default async function SystemsPage() {
 
   const { data: userRoles, error: userRolesError } = await supabaseClient
     .from("z_usuarios_papeis")
-    .select("papel_id, z_papeis ( id, nome, sistema_id )")
+    .select("papel_id, sistema_id, z_papeis ( id, nome )")
     .eq("usuario_id", user.id);
 
   if (userRolesError) {
@@ -51,16 +51,16 @@ export default async function SystemsPage() {
   const systemProfiles = new Map<string, string[]>();
 
   (userRoles ?? []).forEach((entry: any) => {
-    const role = entry.z_papeis as { sistema_id: string | null; nome: string | null } | null;
-    if (!role?.sistema_id) {
+    if (!entry.sistema_id) {
       return;
     }
 
-    const profiles = systemProfiles.get(role.sistema_id) ?? [];
-    if (role.nome && !profiles.includes(role.nome)) {
+    const role = entry.z_papeis as { nome: string | null } | null;
+    const profiles = systemProfiles.get(entry.sistema_id) ?? [];
+    if (role?.nome && !profiles.includes(role.nome)) {
       profiles.push(role.nome);
     }
-    systemProfiles.set(role.sistema_id, profiles);
+    systemProfiles.set(entry.sistema_id, profiles);
   });
 
   const systemIds = Array.from(systemProfiles.keys());

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
 import { hashPassword } from "@/lib/password";
@@ -10,7 +11,6 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
   ArrowRight,
-  Chrome,
   Eye,
   EyeOff,
   Loader2,
@@ -24,23 +24,25 @@ type ZUser = Database["public"]["Tables"]["z_usuarios"]["Row"];
 
 type SystemWithProfile = ZSystem & { profile: string };
 
-const REDIRECT_PATH = "/acesso-geral";
-
 export default function AccessGeneralPage() {
+  const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const skipToDashboard = process.env.NEXT_PUBLIC_SKIP_ACCESS === "true";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [magicLoading, setMagicLoading] = useState(false);
-  const [resetLoading, setResetLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [signOutLoading, setSignOutLoading] = useState(false);
   const [authUser, setAuthUser] = useState<ZUser | null>(null);
   const [systems, setSystems] = useState<SystemWithProfile[]>([]);
   const [systemsLoading, setSystemsLoading] = useState(false);
+  const [changeOpen, setChangeOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [changeLoading, setChangeLoading] = useState(false);
 
   const passwordScore = useMemo(() => {
     let score = 0;
@@ -92,7 +94,7 @@ export default function AccessGeneralPage() {
     try {
       const { data: userRoles, error: userRolesError } = await supabase
         .from("z_usuarios_papeis")
-        .select("papel_id, z_papeis ( id, nome, sistema_id )")
+        .select("papel_id, sistema_id, z_papeis ( id, nome )")
         .eq("usuario_id", authUser.id);
 
       if (userRolesError) throw userRolesError;
@@ -100,13 +102,13 @@ export default function AccessGeneralPage() {
       const systemProfiles = new Map<string, string[]>();
 
       (userRoles ?? []).forEach((entry: any) => {
-        const role = entry.z_papeis as { sistema_id: string | null; nome: string | null } | null;
-        if (!role?.sistema_id) return;
-        const profiles = systemProfiles.get(role.sistema_id) ?? [];
-        if (role.nome && !profiles.includes(role.nome)) {
+        if (!entry.sistema_id) return;
+        const role = entry.z_papeis as { nome: string | null } | null;
+        const profiles = systemProfiles.get(entry.sistema_id) ?? [];
+        if (role?.nome && !profiles.includes(role.nome)) {
           profiles.push(role.nome);
         }
-        systemProfiles.set(role.sistema_id, profiles);
+        systemProfiles.set(entry.sistema_id, profiles);
       });
 
       const systemIds = Array.from(systemProfiles.keys());
@@ -161,6 +163,38 @@ export default function AccessGeneralPage() {
     }
   }, [authUser?.id, loadSystems]);
 
+  useEffect(() => {
+    if (!skipToDashboard || !authUser) return;
+    router.replace("/dashboard");
+  }, [authUser, router, skipToDashboard]);
+
+  const ensureAuthUser = async (normalizedEmail: string, rawPassword: string) => {
+    const response = await fetch("/api/auth/ensure-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: normalizedEmail, password: rawPassword })
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      const errorMessage = payload?.error || "Falha ao liberar acesso.";
+      throw new Error(errorMessage);
+    }
+  };
+
+  const generateTemporaryPassword = () => {
+    const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+    const length = 10;
+    if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
+      const values = new Uint32Array(length);
+      window.crypto.getRandomValues(values);
+      return Array.from(values, (value) => charset[value % charset.length]).join("");
+    }
+    return Array.from({ length }, () =>
+      charset[Math.floor(Math.random() * charset.length)]
+    ).join("");
+  };
+
   const handlePasswordLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage(null);
@@ -190,7 +224,23 @@ export default function AccessGeneralPage() {
         return;
       }
       if (!userRecord.senha_hash) {
-        setMessage("Senha não cadastrada. Use o magic link para acessar.");
+        const generatedPassword = generateTemporaryPassword();
+        const hashed = await hashPassword(generatedPassword);
+        const { error: updateError } = await supabase
+          .from("z_usuarios")
+          .update({ senha_hash: hashed })
+          .eq("id", userRecord.id);
+        if (updateError) throw updateError;
+        await ensureAuthUser(normalizedEmail, generatedPassword);
+        const { error: authError } = await supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password: generatedPassword
+        });
+        if (authError) throw authError;
+        setMessage(
+          `Senha provisória criada: ${generatedPassword}. Troque a senha após o primeiro acesso.`
+        );
+        setPassword("");
         return;
       }
 
@@ -200,6 +250,7 @@ export default function AccessGeneralPage() {
         return;
       }
 
+      await ensureAuthUser(normalizedEmail, password);
       const { error: authError } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password
@@ -210,91 +261,10 @@ export default function AccessGeneralPage() {
       setPassword("");
     } catch (error) {
       console.error("Erro ao autenticar:", error);
-      setMessage("Erro ao autenticar. Verifique os dados e tente novamente.");
+      const reason = error instanceof Error ? error.message : "";
+      setMessage(reason || "Erro ao autenticar. Verifique os dados e tente novamente.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleMagicLink = async () => {
-    if (!supabase) {
-      setMessage("Supabase não configurado. Contate o administrador.");
-      return;
-    }
-    if (!email) {
-      setMessage("Informe o e-mail para enviar o magic link.");
-      return;
-    }
-    setMagicLoading(true);
-    setMessage(null);
-    try {
-      const normalizedEmail = email.trim().toLowerCase();
-      const { error } = await supabase.functions.invoke("send-auth-email", {
-        body: {
-          email: normalizedEmail,
-          flow: "magic",
-          redirectTo: `${window.location.origin}/auth/callback?next=${REDIRECT_PATH}`
-        }
-      });
-      if (error) throw error;
-      setMessage("Magic link enviado. Verifique sua caixa de entrada.");
-    } catch (error) {
-      console.error("Erro no magic link:", error);
-      setMessage("Não foi possível enviar o magic link. Tente novamente.");
-    } finally {
-      setMagicLoading(false);
-    }
-  };
-
-  const handlePasswordReset = async () => {
-    if (!supabase) {
-      setMessage("Supabase não configurado. Contate o administrador.");
-      return;
-    }
-    if (!email) {
-      setMessage("Informe o e-mail para enviar o link de redefinição.");
-      return;
-    }
-    setResetLoading(true);
-    setMessage(null);
-    try {
-      const normalizedEmail = email.trim().toLowerCase();
-      const { error } = await supabase.functions.invoke("send-auth-email", {
-        body: {
-          email: normalizedEmail,
-          flow: "reset",
-          redirectTo: `${window.location.origin}/auth/callback?next=/acesso-reset`
-        }
-      });
-      if (error) throw error;
-      setMessage("Link de redefinição enviado. Verifique sua caixa de entrada.");
-    } catch (error) {
-      console.error("Erro ao enviar link de redefinição:", error);
-      setMessage("Não foi possível enviar o link de redefinição. Tente novamente.");
-    } finally {
-      setResetLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    if (!supabase) {
-      setMessage("Supabase não configurado. Contate o administrador.");
-      return;
-    }
-    setGoogleLoading(true);
-    setMessage(null);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=${REDIRECT_PATH}`
-        }
-      });
-      if (error) throw error;
-    } catch (error) {
-      console.error("Erro ao autenticar com Google:", error);
-      setMessage("Não foi possível autenticar com Google. Tente novamente.");
-      setGoogleLoading(false);
     }
   };
 
@@ -305,6 +275,57 @@ export default function AccessGeneralPage() {
     setAuthUser(null);
     setSystems([]);
     setSignOutLoading(false);
+  };
+
+  const handlePasswordChange = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!supabase || !authUser) return;
+    setMessage(null);
+    setChangeLoading(true);
+
+    try {
+      if (newPassword.length < 8) {
+        setMessage("A nova senha deve ter pelo menos 8 caracteres.");
+        return;
+      }
+      if (newPassword !== confirmNewPassword) {
+        setMessage("A confirmação da nova senha não confere.");
+        return;
+      }
+      if (!authUser.senha_hash) {
+        setMessage("Sua senha atual não está cadastrada.");
+        return;
+      }
+
+      const currentHashed = await hashPassword(currentPassword);
+      if (currentHashed !== authUser.senha_hash) {
+        setMessage("Senha atual inválida.");
+        return;
+      }
+
+      const newHashed = await hashPassword(newPassword);
+      const { error: updateError } = await supabase
+        .from("z_usuarios")
+        .update({ senha_hash: newHashed })
+        .eq("id", authUser.id);
+      if (updateError) throw updateError;
+
+      const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
+      if (authError) throw authError;
+
+      setAuthUser({ ...authUser, senha_hash: newHashed });
+      setMessage("Senha atualizada com sucesso.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+      setChangeOpen(false);
+    } catch (error) {
+      console.error("Erro ao alterar senha:", error);
+      const reason = error instanceof Error ? error.message : "";
+      setMessage(reason || "Não foi possível atualizar a senha.");
+    } finally {
+      setChangeLoading(false);
+    }
   };
 
   return (
@@ -328,8 +349,8 @@ export default function AccessGeneralPage() {
                 Portal seguro para todos os Sistemas
               </h1>
               <p className="mt-2 text-sm text-neutral-600">
-                Acesse sistemas com validação por senha, magic link ou Google. Perfis e permissões
-                são aplicados automaticamente.
+                Acesse sistemas com validação por senha. Perfis e permissões são aplicados
+                automaticamente.
               </p>
             </div>
           </div>
@@ -366,7 +387,66 @@ export default function AccessGeneralPage() {
                       "Atualizar módulos"
                     )}
                   </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setChangeOpen((prev) => !prev)}
+                  >
+                    Trocar senha
+                  </Button>
                 </div>
+                {changeOpen ? (
+                  <form className="space-y-3 rounded-xl border border-neutral-100 bg-neutral-50 p-4" onSubmit={handlePasswordChange}>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-600" htmlFor="current-password">
+                        Senha atual
+                      </label>
+                      <input
+                        id="current-password"
+                        type="password"
+                        value={currentPassword}
+                        onChange={(event) => setCurrentPassword(event.target.value)}
+                        className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-800 outline-none hocus:border-brand-500"
+                        placeholder="Digite sua senha atual"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-600" htmlFor="new-password">
+                        Nova senha
+                      </label>
+                      <input
+                        id="new-password"
+                        type="password"
+                        value={newPassword}
+                        onChange={(event) => setNewPassword(event.target.value)}
+                        className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-800 outline-none hocus:border-brand-500"
+                        placeholder="Digite a nova senha"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-600" htmlFor="confirm-new-password">
+                        Confirmar nova senha
+                      </label>
+                      <input
+                        id="confirm-new-password"
+                        type="password"
+                        value={confirmNewPassword}
+                        onChange={(event) => setConfirmNewPassword(event.target.value)}
+                        className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-800 outline-none hocus:border-brand-500"
+                        placeholder="Confirme a nova senha"
+                      />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={changeLoading}>
+                      {changeLoading ? (
+                        <>
+                          <Loader2 className="mr-2 size-4 animate-spin" />
+                          Salvando...
+                        </>
+                      ) : (
+                        "Atualizar senha"
+                      )}
+                    </Button>
+                  </form>
+                ) : null}
               </div>
             ) : (
               <form className="space-y-4" onSubmit={handlePasswordLogin}>
@@ -432,21 +512,9 @@ export default function AccessGeneralPage() {
                     </div>
                     <span>{passwordLabel}</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handlePasswordReset}
-                    disabled={resetLoading}
-                    className="inline-flex items-center gap-2 text-xs font-semibold text-brand-600 transition hover:text-brand-700 disabled:cursor-not-allowed disabled:text-brand-400"
-                  >
-                    {resetLoading ? (
-                      <>
-                        <Loader2 className="size-3 animate-spin" />
-                        Enviando link...
-                      </>
-                    ) : (
-                      "Esqueci minha senha"
-                    )}
-                  </button>
+                  <p className="text-xs text-neutral-400">
+                    Se você não possui senha, uma provisória será gerada ao tentar acessar.
+                  </p>
                 </div>
 
                 <Button type="submit" className="w-full" disabled={loading}>
@@ -459,53 +527,6 @@ export default function AccessGeneralPage() {
                     "Entrar com senha"
                   )}
                 </Button>
-
-                <div className="flex items-center gap-3">
-                  <span className="h-px flex-1 bg-neutral-100" />
-                  <span className="text-xs font-semibold text-neutral-400">ou</span>
-                  <span className="h-px flex-1 bg-neutral-100" />
-                </div>
-
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleMagicLink}
-                    disabled={magicLoading}
-                    className="justify-center"
-                  >
-                    {magicLoading ? (
-                      <>
-                        <Loader2 className="mr-2 size-4 animate-spin" />
-                        Enviando
-                      </>
-                    ) : (
-                      <>
-                        <Mail className="mr-2 size-4" />
-                        Magic link
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleGoogleLogin}
-                    disabled={googleLoading}
-                    className="justify-center"
-                  >
-                    {googleLoading ? (
-                      <>
-                        <Loader2 className="mr-2 size-4 animate-spin" />
-                        Redirecionando
-                      </>
-                    ) : (
-                      <>
-                        <Chrome className="mr-2 size-4" />
-                        Continuar com Google
-                      </>
-                    )}
-                  </Button>
-                </div>
               </form>
             )}
 

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 export default async function AccessControlPage() {
     const supabase = createSupabaseServerClient();
     if (!supabase) {
-        redirect("/signin");
+        redirect("/acesso-geral");
     }
 
     const {
@@ -13,7 +13,7 @@ export default async function AccessControlPage() {
     } = (await supabase.auth.getUser()) ?? { data: { user: null } };
 
     if (!user) {
-        redirect("/signin");
+        redirect("/acesso-geral");
     }
 
     return <AccessControlClient />;

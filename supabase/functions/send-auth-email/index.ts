@@ -147,9 +147,8 @@ serve(async (req) => {
         };
 
         const supabase = createClient<Database>(supabaseUrl, serviceKey);
-    const linkType = flowValue === "reset" ? "recovery" : "magiclink";
     const { data, error } = await supabase.auth.admin.generateLink({
-      type: linkType,
+      type: "magiclink",
       email,
       options: { redirectTo: finalRedirect }
     });

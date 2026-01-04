@@ -5,7 +5,7 @@ import { AccessAdminClient } from "./access-admin-client";
 export default async function AccessAdminPage() {
   const supabase = createSupabaseServerClient();
   if (!supabase) {
-    redirect("/signin");
+    redirect("/acesso-geral");
   }
 
   const {
@@ -13,7 +13,7 @@ export default async function AccessAdminPage() {
   } = (await supabase.auth.getUser()) ?? { data: { user: null } };
 
   if (!user) {
-    redirect("/signin");
+    redirect("/acesso-geral");
   }
 
   return <AccessAdminClient />;
