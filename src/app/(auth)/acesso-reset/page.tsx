@@ -137,7 +137,7 @@ export default function AccessResetPage() {
         {profile ? (
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="rounded-lg border border-neutral-100 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
-              {profile.nome_completo ? `${profile.nome_completo} · ` : ""}
+              {profile.nome_completo ? profile.nome_completo + " - " : ""}
               {profile.email}
             </div>
             <div className="space-y-2">
