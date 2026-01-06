@@ -61,6 +61,15 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
+  const publicPaths = ["/signin", "/acesso-geral", "/acesso-reset", "/auth", "/api"];
+
+  if (!user && !publicPaths.some((path) => pathname.startsWith(path))) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/acesso-geral";
+    redirectUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(redirectUrl);
+  }
+
   if (user && pathname === "/signin") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }

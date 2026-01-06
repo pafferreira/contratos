@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Database } from "@/lib/supabase/types";
+import { useSupabase } from "@/components/providers/supabase-provider";
 import {
     LayoutGrid,
     List,
@@ -30,6 +31,7 @@ type ZRole = Database["public"]["Tables"]["z_papeis"]["Row"];
 type ZUserRole = Database["public"]["Tables"]["z_usuarios_papeis"]["Row"];
 
 export function AccessControlClient() {
+    const { supabase } = useSupabase();
     const [activeTab, setActiveTab] = useState("users");
 
     // Data State
@@ -45,23 +47,44 @@ export function AccessControlClient() {
     const loadData = useCallback(async () => {
         setLoading(true);
         setError(null);
+        if (!supabase) {
+            setError(
+                "Supabase não configurado. Informe NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+            );
+            setUsers([]);
+            setSystems([]);
+            setRoles([]);
+            setUserRoles([]);
+            setLoading(false);
+            return;
+        }
         try {
-            const response = await fetch("/api/access/data", { cache: "no-store" });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(payload?.error || "Erro ao carregar dados.");
+            const [usersRes, systemsRes, rolesRes, userRolesRes] = await Promise.all([
+                supabase.from("z_usuarios").select("*").order("nome_completo"),
+                supabase.from("z_sistemas").select("*").order("nome"),
+                supabase.from("z_papeis").select("*").order("nome"),
+                supabase.from("z_usuarios_papeis").select("*")
+            ]);
+            if (usersRes.error || systemsRes.error || rolesRes.error || userRolesRes.error) {
+                throw new Error(
+                    usersRes.error?.message ||
+                    systemsRes.error?.message ||
+                    rolesRes.error?.message ||
+                    userRolesRes.error?.message ||
+                    "Erro ao carregar dados."
+                );
             }
-            setUsers(payload?.users ?? []);
-            setSystems(payload?.systems ?? []);
-            setRoles(payload?.roles ?? []);
-            setUserRoles(payload?.userRoles ?? []);
+            setUsers(usersRes.data ?? []);
+            setSystems(systemsRes.data ?? []);
+            setRoles(rolesRes.data ?? []);
+            setUserRoles(userRolesRes.data ?? []);
         } catch (err: any) {
             console.error("Error loading data:", err);
-            setError(err.message || "Erro ao carregar dados.");
+            setError(err?.message || "Erro ao carregar dados.");
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [supabase]);
 
     useEffect(() => {
         loadData();
@@ -141,6 +164,7 @@ export function AccessControlClient() {
 // --- Users Tab Component ---
 
 function UsersTab({ users, systems, roles, userRoles, onRefresh }: any) {
+    const { supabase } = useSupabase();
     const [search, setSearch] = useState("");
     const [viewMode, setViewMode] = useState<"cards" | "list">("list");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -164,17 +188,34 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh }: any) {
     const handleSave = async () => {
         setSaving(true);
         try {
-            const response = await fetch("/api/access/users", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ...formData,
-                    id: editingUser?.id
-                })
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(payload?.error || "Erro ao salvar usuário.");
+            if (!supabase) {
+                throw new Error(
+                    "Supabase não configurado. Informe NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+                );
+            }
+            const normalizedEmail = (formData.email ?? "").trim().toLowerCase();
+            if (!normalizedEmail) {
+                throw new Error("Informe o e-mail do usuário.");
+            }
+            const payload = {
+                nome_completo: formData.nome_completo?.trim() || null,
+                email: normalizedEmail,
+                ativo: formData.ativo ?? true
+            };
+
+            if (editingUser?.id) {
+                const { error: updateError } = await supabase
+                    .from("z_usuarios")
+                    .update(payload)
+                    .eq("id", editingUser.id);
+                if (updateError) {
+                    throw updateError;
+                }
+            } else {
+                const { error: insertError } = await supabase.from("z_usuarios").insert(payload);
+                if (insertError) {
+                    throw insertError;
+                }
             }
             setIsDialogOpen(false);
             onRefresh();
@@ -195,20 +236,23 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh }: any) {
     const handleDelete = async () => {
         if (!pendingDelete) return;
         try {
-            const response = await fetch("/api/access/users", {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: pendingDelete.id })
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(payload?.error || "Erro ao excluir usuário.");
+            if (!supabase) {
+                throw new Error(
+                    "Supabase não configurado. Informe NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+                );
+            }
+            const { error: deleteError } = await supabase
+                .from("z_usuarios")
+                .delete()
+                .eq("id", pendingDelete.id);
+            if (deleteError) {
+                throw deleteError;
             }
             onRefresh();
             setDeleteOpen(false);
             setPendingDelete(null);
         } catch (err: any) {
-            alert("Erro ao excluir: " + err.message);
+            alert("Erro ao excluir: " + (err?.message || "Erro desconhecido."));
         }
     };
 
@@ -453,6 +497,7 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh }: any) {
 // --- User Roles Dialog ---
 
 function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onRefresh }: any) {
+    const { supabase } = useSupabase();
     const [saving, setSaving] = useState(false);
     const hasRoles = roles.length > 0;
 
@@ -472,19 +517,30 @@ function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onR
     const handleToggleRole = async (roleId: string, systemId: string, checked: boolean) => {
         setSaving(true);
         try {
-            const response = await fetch("/api/access/user-roles", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    action: checked ? "add" : "remove",
-                    usuario_id: user.id,
-                    papel_id: roleId,
-                    sistema_id: systemId
-                })
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(payload?.error || "Erro ao atualizar papel.");
+            if (!supabase) {
+                throw new Error(
+                    "Supabase não configurado. Informe NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+                );
+            }
+            if (checked) {
+                const { error: insertError } = await supabase
+                    .from("z_usuarios_papeis")
+                    .insert({
+                        usuario_id: user.id,
+                        papel_id: roleId,
+                        sistema_id: systemId
+                    });
+                if (insertError) {
+                    throw insertError;
+                }
+            } else {
+                const { error: deleteError } = await supabase
+                    .from("z_usuarios_papeis")
+                    .delete()
+                    .match({ usuario_id: user.id, papel_id: roleId, sistema_id: systemId });
+                if (deleteError) {
+                    throw deleteError;
+                }
             }
             onRefresh();
         } catch (err: any) {
@@ -565,6 +621,7 @@ function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onR
 // --- Systems Tab Component ---
 
 function SystemsTab({ systems, userRoles, onRefresh }: any) {
+    const { supabase } = useSupabase();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingSystem, setEditingSystem] = useState<ZSystem | null>(null);
     const [formData, setFormData] = useState<Partial<ZSystem>>({ nome: "", descricao: "", ativo: true });
@@ -585,17 +642,33 @@ function SystemsTab({ systems, userRoles, onRefresh }: any) {
     const handleSave = async () => {
         setSaving(true);
         try {
-            const response = await fetch("/api/access/systems", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ...formData,
-                    id: editingSystem?.id
-                })
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(payload?.error || "Erro ao salvar sistema.");
+            if (!supabase) {
+                throw new Error(
+                    "Supabase não configurado. Informe NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+                );
+            }
+            const nome = (formData.nome ?? "").trim();
+            if (!nome) {
+                throw new Error("Informe o nome do sistema.");
+            }
+            const payload = {
+                nome,
+                descricao: formData.descricao?.trim() || null,
+                ativo: formData.ativo ?? true
+            };
+            if (editingSystem?.id) {
+                const { error: updateError } = await supabase
+                    .from("z_sistemas")
+                    .update(payload)
+                    .eq("id", editingSystem.id);
+                if (updateError) {
+                    throw updateError;
+                }
+            } else {
+                const { error: insertError } = await supabase.from("z_sistemas").insert(payload);
+                if (insertError) {
+                    throw insertError;
+                }
             }
             setIsDialogOpen(false);
             onRefresh();
@@ -614,14 +687,17 @@ function SystemsTab({ systems, userRoles, onRefresh }: any) {
     const handleDelete = async () => {
         if (!pendingDelete) return;
         try {
-            const response = await fetch("/api/access/systems", {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: pendingDelete.id })
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(payload?.error || "Erro ao excluir sistema.");
+            if (!supabase) {
+                throw new Error(
+                    "Supabase não configurado. Informe NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+                );
+            }
+            const { error: deleteError } = await supabase
+                .from("z_sistemas")
+                .delete()
+                .eq("id", pendingDelete.id);
+            if (deleteError) {
+                throw deleteError;
             }
             onRefresh();
             setDeleteOpen(false);
@@ -765,6 +841,7 @@ function SystemsTab({ systems, userRoles, onRefresh }: any) {
 // --- Roles Tab Component ---
 
 function RolesTab({ roles, users, userRoles, systems, onRefresh }: any) {
+    const { supabase } = useSupabase();
     const [search, setSearch] = useState("");
     const [viewMode, setViewMode] = useState<"cards" | "list">("list");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -833,25 +910,23 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh }: any) {
                 setSaving(false);
                 return;
             }
-            if (editingRole) {
-                const response = await fetch("/api/access/roles", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ ...payload, id: editingRole.id })
-                });
-                const responseBody = await response.json().catch(() => ({}));
-                if (!response.ok) {
-                    throw new Error(responseBody?.error || "Erro ao salvar papel.");
+            if (!supabase) {
+                throw new Error(
+                    "Supabase não configurado. Informe NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+                );
+            }
+            if (editingRole?.id) {
+                const { error: updateError } = await supabase
+                    .from("z_papeis")
+                    .update(payload)
+                    .eq("id", editingRole.id);
+                if (updateError) {
+                    throw updateError;
                 }
             } else {
-                const response = await fetch("/api/access/roles", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-                const responseBody = await response.json().catch(() => ({}));
-                if (!response.ok) {
-                    throw new Error(responseBody?.error || "Erro ao salvar papel.");
+                const { error: insertError } = await supabase.from("z_papeis").insert(payload);
+                if (insertError) {
+                    throw insertError;
                 }
             }
             setIsDialogOpen(false);
@@ -871,14 +946,17 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh }: any) {
     const handleDelete = async () => {
         if (!pendingDelete) return;
         try {
-            const response = await fetch("/api/access/roles", {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: pendingDelete.id })
-            });
-            const responseBody = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(responseBody?.error || "Erro ao excluir papel.");
+            if (!supabase) {
+                throw new Error(
+                    "Supabase não configurado. Informe NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+                );
+            }
+            const { error: deleteError } = await supabase
+                .from("z_papeis")
+                .delete()
+                .eq("id", pendingDelete.id);
+            if (deleteError) {
+                throw deleteError;
             }
             onRefresh();
             setDeleteOpen(false);
@@ -1162,6 +1240,7 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh }: any) {
 // --- Role Users Dialog ---
 
 function RoleUsersDialog({ role, users, systems, userRoles, isOpen, onClose, onRefresh }: any) {
+    const { supabase } = useSupabase();
     const [saving, setSaving] = useState(false);
     const [selectedSystemId, setSelectedSystemId] = useState<string>(systems[0]?.id ?? "");
 
@@ -1180,19 +1259,30 @@ function RoleUsersDialog({ role, users, systems, userRoles, isOpen, onClose, onR
     const handleToggleUser = async (userId: string, checked: boolean) => {
         setSaving(true);
         try {
-            const response = await fetch("/api/access/user-roles", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    action: checked ? "add" : "remove",
-                    usuario_id: userId,
-                    papel_id: role.id,
-                    sistema_id: selectedSystemId
-                })
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(payload?.error || "Erro ao atualizar vínculo.");
+            if (!supabase) {
+                throw new Error(
+                    "Supabase não configurado. Informe NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+                );
+            }
+            if (checked) {
+                const { error: insertError } = await supabase
+                    .from("z_usuarios_papeis")
+                    .insert({
+                        usuario_id: userId,
+                        papel_id: role.id,
+                        sistema_id: selectedSystemId
+                    });
+                if (insertError) {
+                    throw insertError;
+                }
+            } else {
+                const { error: deleteError } = await supabase
+                    .from("z_usuarios_papeis")
+                    .delete()
+                    .match({ usuario_id: userId, papel_id: role.id, sistema_id: selectedSystemId });
+                if (deleteError) {
+                    throw deleteError;
+                }
             }
             onRefresh();
         } catch (err: any) {

@@ -7,7 +7,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ShieldCheck } from "lucide-react";
+import { Lock, ShieldCheck } from "lucide-react";
 
 type ZUser = Database["public"]["Tables"]["z_usuarios"]["Row"];
 
@@ -19,6 +19,7 @@ export default function AccessGeneralPage() {
 
   const [users, setUsers] = useState<ZUser[]>([]);
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -56,14 +57,58 @@ export default function AccessGeneralPage() {
     setMessage(null);
     setSubmitting(true);
 
-    if (!selectedUser) {
-      setMessage("Selecione um usuário válido.");
+    if (!supabase) {
+      setMessage("Supabase não configurado. Contate o administrador.");
       setSubmitting(false);
       return;
     }
 
-    sessionStorage.setItem("mock_user_email", selectedUser.email);
-    router.push(redirectTo);
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setMessage("Informe seu e-mail.");
+      setSubmitting(false);
+      return;
+    }
+
+    if (!password) {
+      setMessage("Informe sua senha.");
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      const ensureResponse = await fetch("/api/auth/ensure-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail, password })
+      });
+      const ensurePayload = await ensureResponse.json().catch(() => ({}));
+
+      if (!ensureResponse.ok) {
+        setMessage(ensurePayload?.error || "Não foi possível validar o usuário.");
+        setSubmitting(false);
+        return;
+      }
+
+      const finalPassword = ensurePayload?.tempPassword || password;
+      const nextRoute = ensurePayload?.tempPassword ? "/acesso-reset" : redirectTo;
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: finalPassword
+      });
+
+      if (authError) {
+        setMessage("E-mail ou senha inválidos.");
+        setSubmitting(false);
+        return;
+      }
+
+      router.push(nextRoute);
+    } catch (err) {
+      console.error("Erro ao autenticar:", err);
+      setMessage("Não foi possível autenticar. Tente novamente.");
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -86,7 +131,7 @@ export default function AccessGeneralPage() {
               Portal seguro para todos os Sistemas
             </h1>
             <p className="mt-2 text-sm text-neutral-600">
-              Selecione um usuário para entrar. A segurança será retomada em breve.
+              Informe suas credenciais para acessar os sistemas.
             </p>
           </div>
         </div>
@@ -120,6 +165,23 @@ export default function AccessGeneralPage() {
                   {selectedUser.nome_completo ?? selectedUser.email}
                 </p>
               ) : null}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-neutral-700" htmlFor="password">
+                Senha
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="w-full rounded-lg border border-neutral-200 bg-white py-2 pl-10 pr-3 text-sm text-neutral-800 outline-none hocus:border-brand-500"
+                  placeholder="Digite sua senha"
+                  required
+                />
+              </div>
             </div>
 
             <Button type="submit" className="w-full" disabled={submitting || loadingUsers}>

@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import * as Dialog from "@radix-ui/react-dialog";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import {
   Eye,
   EyeOff,
@@ -64,22 +65,40 @@ export function AccessAdminClient() {
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
+    if (!supabase) {
+      setError(
+        "Supabase não configurado. Informe NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+      setUsers([]);
+      setUserRoles([]);
+      setSystems([]);
+      setLoading(false);
+      return;
+    }
     try {
-      const response = await fetch("/api/access/data", { cache: "no-store" });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload?.error || "Erro ao carregar dados.");
+      const [usersRes, userRolesRes, systemsRes] = await Promise.all([
+        supabase.from("z_usuarios").select("*").order("nome_completo"),
+        supabase.from("z_usuarios_papeis").select("*"),
+        supabase.from("z_sistemas").select("*").order("nome")
+      ]);
+      if (usersRes.error || userRolesRes.error || systemsRes.error) {
+        throw new Error(
+          usersRes.error?.message ||
+          userRolesRes.error?.message ||
+          systemsRes.error?.message ||
+          "Erro ao carregar dados."
+        );
       }
-      setUsers(payload?.users ?? []);
-      setUserRoles(payload?.userRoles ?? []);
-      setSystems(payload?.systems ?? []);
+      setUsers(usersRes.data ?? []);
+      setUserRoles(userRolesRes.data ?? []);
+      setSystems(systemsRes.data ?? []);
     } catch (err: any) {
       console.error("Erro ao carregar dados:", err);
-      setError(err.message || "Erro ao carregar dados.");
+      setError(err?.message || "Erro ao carregar dados.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     loadData();
@@ -145,6 +164,13 @@ export function AccessAdminClient() {
     setSaving(true);
     setActionMessage(null);
     try {
+      if (!supabase) {
+        setActionMessage(
+          "Supabase não configurado. Informe NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+        );
+        setSaving(false);
+        return;
+      }
       if (!formData.email) {
         setActionMessage("Informe o e-mail do usuário.");
         setSaving(false);
@@ -168,17 +194,19 @@ export function AccessAdminClient() {
         payload.senha_hash = await hashPassword(passwordValue);
       }
 
-      const response = await fetch("/api/access/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...payload,
-          id: editingUser?.id
-        })
-      });
-      const responseBody = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(responseBody?.error || "Erro ao salvar usuário.");
+      if (editingUser?.id) {
+        const { error: updateError } = await supabase
+          .from("z_usuarios")
+          .update(payload)
+          .eq("id", editingUser.id);
+        if (updateError) {
+          throw updateError;
+        }
+      } else {
+        const { error: insertError } = await supabase.from("z_usuarios").insert(payload);
+        if (insertError) {
+          throw insertError;
+        }
       }
 
       setIsDialogOpen(false);
@@ -199,14 +227,17 @@ export function AccessAdminClient() {
   const handleDelete = async () => {
     if (!pendingDelete) return;
     try {
-      const response = await fetch("/api/access/users", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: pendingDelete.id })
-      });
-      const responseBody = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(responseBody?.error || "Erro ao excluir usuário.");
+      if (!supabase) {
+        throw new Error(
+          "Supabase não configurado. Informe NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+        );
+      }
+      const { error: deleteError } = await supabase
+        .from("z_usuarios")
+        .delete()
+        .eq("id", pendingDelete.id);
+      if (deleteError) {
+        throw deleteError;
       }
       setDeleteOpen(false);
       setPendingDelete(null);
@@ -394,36 +425,39 @@ export function AccessAdminClient() {
                 <td className="p-3 text-neutral-500">{formatDate(user.atualizado_em)}</td>
                 <td className="p-3 text-right">
                   <div className="flex justify-end gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="Resetar senha"
-                      onClick={() => handleSendPasswordReset(user)}
-                      disabled={resetLoadingId === user.id}
-                    >
-                      {resetLoadingId === user.id ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <KeyRound className="size-4" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="Editar"
-                      onClick={() => openEditDialog(user)}
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="Excluir"
-                      className="text-red-600 hover:text-red-700"
-                      onClick={() => confirmDelete(user)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
+                    <ActionTooltip label="Resetar senha">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleSendPasswordReset(user)}
+                        disabled={resetLoadingId === user.id}
+                      >
+                        {resetLoadingId === user.id ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <KeyRound className="size-4" />
+                        )}
+                      </Button>
+                    </ActionTooltip>
+                    <ActionTooltip label="Editar">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEditDialog(user)}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                    </ActionTooltip>
+                    <ActionTooltip label="Excluir">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-600 hover:text-red-700"
+                        onClick={() => confirmDelete(user)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </ActionTooltip>
                   </div>
                 </td>
               </tr>
@@ -576,5 +610,25 @@ export function AccessAdminClient() {
         </Dialog.Portal>
       </Dialog.Root>
     </div>
+  );
+}
+
+function ActionTooltip({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <Tooltip.Provider delayDuration={150}>
+      <Tooltip.Root>
+        <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
+        <Tooltip.Portal>
+          <Tooltip.Content
+            side="top"
+            sideOffset={6}
+            className="z-50 rounded-md bg-white px-3 py-1 text-xs font-semibold text-neutral-900 shadow-lg"
+          >
+            {label}
+            <Tooltip.Arrow className="fill-white" />
+          </Tooltip.Content>
+        </Tooltip.Portal>
+      </Tooltip.Root>
+    </Tooltip.Provider>
   );
 }
