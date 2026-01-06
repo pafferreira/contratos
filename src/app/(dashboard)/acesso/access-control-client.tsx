@@ -179,7 +179,9 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh }: any) {
             setIsDialogOpen(false);
             onRefresh();
         } catch (err: any) {
-            alert("Erro ao salvar usuário: " + err.message);
+            console.error("Erro ao salvar usuário:", err);
+            const message = err?.message || "Erro ao salvar usuário.";
+            alert(`Erro ao salvar usuário: ${message}`);
         } finally {
             setSaving(false);
         }

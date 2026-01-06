@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 
+export const runtime = "nodejs";
+
 type Payload = {
   id?: string;
   nome?: string;
@@ -26,55 +28,70 @@ function getServerSupabase() {
 }
 
 export async function POST(request: Request) {
-  const { supabase, error } = getServerSupabase();
-  if (!supabase || error) {
-    return NextResponse.json({ error }, { status: 500 });
-  }
-
-  const payload = (await request.json()) as Payload;
-  if (!payload.nome) {
-    return NextResponse.json({ error: "Nome obrigatório." }, { status: 400 });
-  }
-
-  const data = {
-    nome: payload.nome,
-    descricao: payload.descricao ?? null,
-    ativo: payload.ativo ?? true
-  };
-
-  if (payload.id) {
-    const { error: updateError } = await supabase
-      .from("z_sistemas")
-      .update(data)
-      .eq("id", payload.id);
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
+  try {
+    const { supabase, error } = getServerSupabase();
+    if (!supabase || error) {
+      return NextResponse.json({ error }, { status: 500 });
     }
-  } else {
-    const { error: insertError } = await supabase.from("z_sistemas").insert(data);
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
-    }
-  }
 
-  return NextResponse.json({ success: true });
+    const payload = (await request.json()) as Payload;
+    if (!payload.nome) {
+      return NextResponse.json({ error: "Nome obrigatório." }, { status: 400 });
+    }
+
+    const data = {
+      nome: payload.nome,
+      descricao: payload.descricao ?? null,
+      ativo: payload.ativo ?? true
+    };
+
+    if (payload.id) {
+      const { error: updateError } = await supabase
+        .from("z_sistemas")
+        .update(data)
+        .eq("id", payload.id);
+      if (updateError) {
+        return NextResponse.json({ error: updateError.message }, { status: 500 });
+      }
+    } else {
+      const { error: insertError } = await supabase.from("z_sistemas").insert(data);
+      if (insertError) {
+        return NextResponse.json({ error: insertError.message }, { status: 500 });
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Erro ao salvar sistema:", err);
+    const message = err instanceof Error ? err.message : "Erro inesperado.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 export async function DELETE(request: Request) {
-  const { supabase, error } = getServerSupabase();
-  if (!supabase || error) {
-    return NextResponse.json({ error }, { status: 500 });
-  }
+  try {
+    const { supabase, error } = getServerSupabase();
+    if (!supabase || error) {
+      return NextResponse.json({ error }, { status: 500 });
+    }
 
-  const payload = (await request.json()) as { id?: string };
-  if (!payload.id) {
-    return NextResponse.json({ error: "Id obrigatório." }, { status: 400 });
-  }
+    const payload = (await request.json()) as { id?: string };
+    if (!payload.id) {
+      return NextResponse.json({ error: "Id obrigatório." }, { status: 400 });
+    }
 
-  const { error: deleteError } = await supabase.from("z_sistemas").delete().eq("id", payload.id);
-  if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 500 });
-  }
+    const { error: deleteError } = await supabase
+      .from("z_sistemas")
+      .delete()
+      .eq("id", payload.id);
+    if (deleteError) {
+      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    }
 
-  return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Erro ao excluir sistema:", err);
+    const message = err instanceof Error ? err.message : "Erro inesperado.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

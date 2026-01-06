@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 
+export const runtime = "nodejs";
+
 type Payload = {
   action?: "add" | "remove";
   usuario_id?: string;
@@ -26,34 +28,40 @@ function getServerSupabase() {
 }
 
 export async function POST(request: Request) {
-  const { supabase, error } = getServerSupabase();
-  if (!supabase || error) {
-    return NextResponse.json({ error }, { status: 500 });
-  }
-
-  const payload = (await request.json()) as Payload;
-  const { action, usuario_id, papel_id, sistema_id } = payload;
-
-  if (!action || !usuario_id || !papel_id || !sistema_id) {
-    return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
-  }
-
-  if (action === "add") {
-    const { error: insertError } = await supabase
-      .from("z_usuarios_papeis")
-      .insert({ usuario_id, papel_id, sistema_id });
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+  try {
+    const { supabase, error } = getServerSupabase();
+    if (!supabase || error) {
+      return NextResponse.json({ error }, { status: 500 });
     }
-  } else {
-    const { error: deleteError } = await supabase
-      .from("z_usuarios_papeis")
-      .delete()
-      .match({ usuario_id, papel_id, sistema_id });
-    if (deleteError) {
-      return NextResponse.json({ error: deleteError.message }, { status: 500 });
-    }
-  }
 
-  return NextResponse.json({ success: true });
+    const payload = (await request.json()) as Payload;
+    const { action, usuario_id, papel_id, sistema_id } = payload;
+
+    if (!action || !usuario_id || !papel_id || !sistema_id) {
+      return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
+    }
+
+    if (action === "add") {
+      const { error: insertError } = await supabase
+        .from("z_usuarios_papeis")
+        .insert({ usuario_id, papel_id, sistema_id });
+      if (insertError) {
+        return NextResponse.json({ error: insertError.message }, { status: 500 });
+      }
+    } else {
+      const { error: deleteError } = await supabase
+        .from("z_usuarios_papeis")
+        .delete()
+        .match({ usuario_id, papel_id, sistema_id });
+      if (deleteError) {
+        return NextResponse.json({ error: deleteError.message }, { status: 500 });
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Erro ao atualizar papeis:", err);
+    const message = err instanceof Error ? err.message : "Erro inesperado.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
