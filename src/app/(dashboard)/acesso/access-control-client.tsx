@@ -140,7 +140,6 @@ export function AccessControlClient() {
                 <TabsContent value="systems" className="mt-6 space-y-4">
                     <SystemsTab
                         systems={systems}
-                        userRoles={userRoles}
                         onRefresh={loadData}
                     />
                 </TabsContent>
@@ -148,9 +147,6 @@ export function AccessControlClient() {
                 <TabsContent value="roles" className="mt-6 space-y-4">
                     <RolesTab
                         roles={roles}
-                        users={users}
-                        userRoles={userRoles}
-                        systems={systems}
                         onRefresh={loadData}
                     />
                 </TabsContent>
@@ -480,15 +476,15 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh }: any) {
 
             {/* Roles Management Dialog */}
             {selectedUserForRoles && (
-                <UserRolesDialog
-                    user={selectedUserForRoles}
-                    isOpen={isRolesDialogOpen}
-                    onClose={() => setIsRolesDialogOpen(false)}
-                    systems={systems}
-                    roles={roles}
-                    userRoles={userRoles}
-                    onRefresh={onRefresh}
-                />
+                    <UserRolesDialog
+                        user={selectedUserForRoles}
+                        isOpen={isRolesDialogOpen}
+                        onClose={() => setIsRolesDialogOpen(false)}
+                        systems={systems}
+                        roles={roles}
+                        userRoles={userRoles}
+                        onRefresh={onRefresh}
+                    />
             )}
         </>
     );
@@ -499,22 +495,38 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh }: any) {
 function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onRefresh }: any) {
     const { supabase } = useSupabase();
     const [saving, setSaving] = useState(false);
+    const [selectedSystemId, setSelectedSystemId] = useState<string>(systems[0]?.id ?? "");
+    const [selectedRoleId, setSelectedRoleId] = useState("");
     const hasRoles = roles.length > 0;
 
-    // Group roles by system
-    const rolesBySystem = useMemo(() => {
-        const grouped: Record<string, ZRole[]> = {};
-        const sortedRoles = [...roles].sort((a, b) => a.nome.localeCompare(b.nome));
-        systems.forEach((sys: ZSystem) => {
-            grouped[sys.id] = sortedRoles;
-        });
-        return grouped;
-    }, [systems, roles]);
+    useEffect(() => {
+        if (!selectedSystemId && systems.length > 0) {
+            setSelectedSystemId(systems[0].id);
+        }
+    }, [selectedSystemId, systems]);
 
-    // Current user roles
-    const currentUserRoles = userRoles.filter((ur: ZUserRole) => ur.usuario_id === user.id);
+    useEffect(() => {
+        setSelectedRoleId("");
+    }, [selectedSystemId]);
 
-    const handleToggleRole = async (roleId: string, systemId: string, checked: boolean) => {
+    const currentUserRoleIds = useMemo(() => {
+        return new Set(
+            userRoles
+                .filter((ur: ZUserRole) => ur.usuario_id === user.id && ur.sistema_id === selectedSystemId)
+                .map((ur: ZUserRole) => ur.papel_id)
+                .filter(Boolean)
+        );
+    }, [selectedSystemId, user.id, userRoles]);
+
+    const sortedRoles = useMemo(
+        () => [...roles].sort((a, b) => a.nome.localeCompare(b.nome)),
+        [roles]
+    );
+
+    const assignedRoles = sortedRoles.filter((role) => currentUserRoleIds.has(role.id));
+    const availableRoles = sortedRoles.filter((role) => !currentUserRoleIds.has(role.id));
+
+    const handleToggleRole = async (roleId: string, checked: boolean) => {
         setSaving(true);
         try {
             if (!supabase) {
@@ -522,25 +534,20 @@ function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onR
                     "Supabase não configurado. Informe NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
                 );
             }
+            if (!selectedSystemId) {
+                throw new Error("Selecione um sistema.");
+            }
             if (checked) {
                 const { error: insertError } = await supabase
                     .from("z_usuarios_papeis")
-                    .insert({
-                        usuario_id: user.id,
-                        papel_id: roleId,
-                        sistema_id: systemId
-                    });
-                if (insertError) {
-                    throw insertError;
-                }
+                    .insert({ usuario_id: user.id, papel_id: roleId, sistema_id: selectedSystemId });
+                if (insertError) throw insertError;
             } else {
                 const { error: deleteError } = await supabase
                     .from("z_usuarios_papeis")
                     .delete()
-                    .match({ usuario_id: user.id, papel_id: roleId, sistema_id: systemId });
-                if (deleteError) {
-                    throw deleteError;
-                }
+                    .match({ usuario_id: user.id, papel_id: roleId, sistema_id: selectedSystemId });
+                if (deleteError) throw deleteError;
             }
             onRefresh();
         } catch (err: any) {
@@ -559,7 +566,7 @@ function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onR
                         Acessos de {user.nome_completo}
                     </Dialog.Title>
                     <Dialog.Description className="mb-4 text-sm text-neutral-500">
-                        Gerencie os papeis atribuídos a este usuário em cada sistema.
+                        Selecione um sistema e atribua os papeis desejados para este usuário.
                     </Dialog.Description>
 
                     {!hasRoles ? (
@@ -567,43 +574,100 @@ function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onR
                             Nenhum papel cadastrado. Crie papéis antes de atribuir acessos por sistema.
                         </div>
                     ) : (
-                        <div className="space-y-6">
-                            {systems.map((sys: ZSystem) => {
-                                const sysRoles = rolesBySystem[sys.id] || [];
-                                if (sysRoles.length === 0) return null;
+                        <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+                            <div className="space-y-2">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                                    Sistemas
+                                </p>
+                                <div className="space-y-2">
+                                    {systems.map((sys: ZSystem) => (
+                                        <button
+                                            key={sys.id}
+                                            type="button"
+                                            onClick={() => setSelectedSystemId(sys.id)}
+                                            className={cn(
+                                                "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition",
+                                                selectedSystemId === sys.id
+                                                    ? "border-brand-200 bg-brand-50 text-brand-700"
+                                                    : "border-neutral-100 text-neutral-600 hover:bg-neutral-50"
+                                            )}
+                                        >
+                                            <Monitor className="size-4" />
+                                            <span className="truncate">{sys.nome}</span>
+                                        </button>
+                                    ))}
+                                    {systems.length === 0 && (
+                                        <p className="text-sm text-neutral-500">Nenhum sistema cadastrado.</p>
+                                    )}
+                                </div>
+                            </div>
 
-                                return (
-                                    <div key={sys.id} className="rounded-lg border p-4">
-                                        <h4 className="mb-3 flex items-center gap-2 font-semibold text-neutral-900">
-                                            <Monitor className="size-4 text-neutral-500" />
-                                            {sys.nome}
-                                        </h4>
-                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                            {sysRoles.map((role: ZRole) => {
-                                                const hasRole = currentUserRoles.some(
-                                                    (ur: ZUserRole) =>
-                                                        ur.papel_id === role.id && ur.sistema_id === sys.id
-                                                );
-                                                return (
-                                                    <label key={role.id} className="flex cursor-pointer items-center gap-2 rounded p-2 text-sm hover:bg-neutral-50">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={hasRole}
-                                                            onChange={(e) => handleToggleRole(role.id, sys.id, e.target.checked)}
-                                                            disabled={saving}
-                                                            className="rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
-                                                        />
-                                                        <span>{role.nome}</span>
-                                                    </label>
-                                                );
-                                            })}
+                            <div className="space-y-4">
+                                <div className="rounded-lg border border-neutral-100 bg-neutral-50 p-4">
+                                    <p className="text-sm font-semibold text-neutral-800">
+                                        Papeis atribuídos
+                                    </p>
+                                    {assignedRoles.length === 0 ? (
+                                        <p className="mt-2 text-sm text-neutral-500">
+                                            Nenhum papel atribuído para este sistema.
+                                        </p>
+                                    ) : (
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            {assignedRoles.map((role) => (
+                                                <span
+                                                    key={role.id}
+                                                    className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-semibold text-neutral-700"
+                                                >
+                                                    {role.nome}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleToggleRole(role.id, false)}
+                                                        disabled={saving}
+                                                        className="text-neutral-400 hover:text-neutral-600"
+                                                    >
+                                                        <X className="size-3" />
+                                                    </button>
+                                                </span>
+                                            ))}
                                         </div>
+                                    )}
+                                </div>
+
+                                <div className="rounded-lg border border-neutral-100 p-4">
+                                    <p className="text-sm font-semibold text-neutral-800">
+                                        Adicionar papel ao sistema
+                                    </p>
+                                    <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                                        <select
+                                            className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm"
+                                            value={selectedRoleId}
+                                            onChange={(e) => setSelectedRoleId(e.target.value)}
+                                            disabled={availableRoles.length === 0}
+                                        >
+                                            <option value="" disabled>
+                                                {availableRoles.length === 0
+                                                    ? "Nenhum papel disponivel"
+                                                    : "Selecione um papel"}
+                                            </option>
+                                            {availableRoles.map((role) => (
+                                                <option key={role.id} value={role.id}>
+                                                    {role.nome}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <Button
+                                            onClick={() => {
+                                                if (!selectedRoleId) return;
+                                                handleToggleRole(selectedRoleId, true);
+                                                setSelectedRoleId("");
+                                            }}
+                                            disabled={!selectedRoleId || saving}
+                                        >
+                                            Adicionar
+                                        </Button>
                                     </div>
-                                );
-                            })}
-                            {systems.length === 0 && (
-                                <p className="text-center text-neutral-500">Nenhum sistema cadastrado.</p>
-                            )}
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -620,7 +684,7 @@ function UserRolesDialog({ user, isOpen, onClose, systems, roles, userRoles, onR
 
 // --- Systems Tab Component ---
 
-function SystemsTab({ systems, userRoles, onRefresh }: any) {
+function SystemsTab({ systems, onRefresh }: any) {
     const { supabase } = useSupabase();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingSystem, setEditingSystem] = useState<ZSystem | null>(null);
@@ -629,15 +693,6 @@ function SystemsTab({ systems, userRoles, onRefresh }: any) {
 
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [pendingDelete, setPendingDelete] = useState<ZSystem | null>(null);
-
-    const rolesBySystem = useMemo(() => {
-        const map = new Map<string, number>();
-        (userRoles as ZUserRole[]).forEach((entry) => {
-            if (!entry.sistema_id) return;
-            map.set(entry.sistema_id, (map.get(entry.sistema_id) ?? 0) + 1);
-        });
-        return map;
-    }, [userRoles]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -738,11 +793,6 @@ function SystemsTab({ systems, userRoles, onRefresh }: any) {
                             </div>
                         </div>
                         <p className="mt-2 text-sm text-neutral-500">{sys.descricao || "Sem descrição"}</p>
-                        {(rolesBySystem.get(sys.id) ?? 0) === 0 && (
-                            <p className="mt-2 text-xs font-semibold text-warning">
-                                Nenhum papel atribuído para este sistema.
-                            </p>
-                        )}
                         <div className="mt-4 flex items-center gap-2">
                             <span className={cn("inline-flex h-2 w-2 rounded-full", sys.ativo ? "bg-green-500" : "bg-neutral-300")} />
                             <span className="text-xs text-neutral-500">{sys.ativo ? "Ativo" : "Inativo"}</span>
@@ -840,71 +890,36 @@ function SystemsTab({ systems, userRoles, onRefresh }: any) {
 
 // --- Roles Tab Component ---
 
-function RolesTab({ roles, users, userRoles, systems, onRefresh }: any) {
+function RolesTab({ roles, onRefresh }: any) {
     const { supabase } = useSupabase();
     const [search, setSearch] = useState("");
     const [viewMode, setViewMode] = useState<"cards" | "list">("list");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingRole, setEditingRole] = useState<ZRole | null>(null);
-    const [formData, setFormData] = useState<Partial<ZRole>>({ nome: "" });
+    const [formData, setFormData] = useState<Partial<ZRole>>({ nome: "", descricao: "", sistema_id: "" });
     const [saving, setSaving] = useState(false);
 
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [pendingDelete, setPendingDelete] = useState<ZRole | null>(null);
-    const [isRoleUsersOpen, setIsRoleUsersOpen] = useState(false);
-    const [selectedRoleForUsers, setSelectedRoleForUsers] = useState<ZRole | null>(null);
-
-    const usersByRole = useMemo(() => {
-        const map = new Map<string, string[]>();
-        userRoles.forEach((ur: ZUserRole) => {
-            const user = users.find((u: ZUser) => u.id === ur.usuario_id);
-            if (!user) return;
-            const key = `${ur.papel_id ?? ""}::${ur.sistema_id ?? ""}`;
-            const list = map.get(key) ?? [];
-            list.push(user.nome_completo || user.email);
-            map.set(key, list);
-        });
-        map.forEach((list, key) => {
-            map.set(key, Array.from(new Set(list)).sort((a, b) => a.localeCompare(b)));
-        });
-        return map;
-    }, [userRoles, users]);
-
-    const systemNameById = useMemo(() => {
-        const map = new Map<string, string>();
-        systems.forEach((system: ZSystem) => {
-            map.set(system.id, system.nome);
-        });
-        return map;
-    }, [systems]);
 
     const filteredRoles = roles.filter((r: ZRole) => {
         const searchValue = search.toLowerCase();
         if (!searchValue) return true;
 
-        if (r.nome.toLowerCase().includes(searchValue)) return true;
-
-        const systemMatches = systems.some((system: ZSystem) => {
-            if (!system.nome.toLowerCase().includes(searchValue)) return false;
-            const key = `${r.id}::${system.id}`;
-            return (usersByRole.get(key) ?? []).length > 0;
-        });
-        if (systemMatches) return true;
-
-        const hasUserMatch = systems.some((system: ZSystem) => {
-            const key = `${r.id}::${system.id}`;
-            return (usersByRole.get(key) ?? []).some((name) =>
-                name.toLowerCase().includes(searchValue)
-            );
-        });
-
-        return hasUserMatch;
+        return (
+            r.nome.toLowerCase().includes(searchValue) ||
+            r.descricao?.toLowerCase().includes(searchValue)
+        );
     });
 
     const handleSave = async () => {
         setSaving(true);
         try {
-            const payload = { nome: (formData.nome ?? "").trim() };
+            const descricao = (formData.descricao ?? "").trim();
+            const payload = {
+                nome: (formData.nome ?? "").trim(),
+                descricao: descricao || null
+            };
             if (!payload.nome) {
                 alert("Informe o nome do papel.");
                 setSaving(false);
@@ -968,19 +983,17 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh }: any) {
 
     const handleCreateRole = () => {
         setEditingRole(null);
-        setFormData({ nome: "" });
+        setFormData({ nome: "", descricao: "" });
         setIsDialogOpen(true);
     };
 
     const handleEditRole = (role: ZRole) => {
         setEditingRole(role);
-        setFormData({ nome: role.nome });
+        setFormData({
+            nome: role.nome,
+            descricao: role.descricao ?? ""
+        });
         setIsDialogOpen(true);
-    };
-
-    const handleManageUsers = (role: ZRole) => {
-        setSelectedRoleForUsers(role);
-        setIsRoleUsersOpen(true);
     };
 
     return (
@@ -1039,11 +1052,6 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh }: any) {
                                             <Pencil className="size-4" />
                                         </Button>
                                     </ActionTooltip>
-                                    <ActionTooltip label="Usuários">
-                                        <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleManageUsers(role)}>
-                                            <Users className="size-4" />
-                                        </Button>
-                                    </ActionTooltip>
                                     <ActionTooltip label="Excluir">
                                         <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-red-600" onClick={() => confirmDelete(role)}>
                                             <Trash2 className="size-4" />
@@ -1051,21 +1059,9 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh }: any) {
                                     </ActionTooltip>
                                 </div>
                             </div>
-                            <div className="mt-3 space-y-1 text-xs text-neutral-500">
-                                {systems.length === 0 ? (
-                                    <p>Sem sistemas cadastrados.</p>
-                                ) : (
-                                    systems.map((system: ZSystem) => {
-                                        const key = `${role.id}::${system.id}`;
-                                        const total = (usersByRole.get(key) ?? []).length;
-                                        return (
-                                            <p key={system.id}>
-                                                {system.nome}: {total} usuário(s)
-                                            </p>
-                                        );
-                                    })
-                                )}
-                            </div>
+                            <p className="mt-3 text-sm text-neutral-500">
+                                {role.descricao || "Sem descrição."}
+                            </p>
                         </Card>
                     ))}
                 </div>
@@ -1075,78 +1071,34 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh }: any) {
                         <thead className="bg-neutral-50 text-neutral-500">
                             <tr>
                                 <th className="p-3 text-left font-medium">Papel</th>
-                                <th className="p-3 text-left font-medium">Sistema</th>
-                                <th className="p-3 text-left font-medium">Usuários</th>
+                                <th className="p-3 text-left font-medium">Descrição</th>
                                 <th className="p-3 text-right font-medium">Ações</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-100">
                             {filteredRoles.map((role: ZRole) => (
-                                systems.length > 0 ? (
-                                    systems.map((system: ZSystem) => {
-                                        const key = `${role.id}::${system.id}`;
-                                        const usersList = usersByRole.get(key) ?? [];
-                                        return (
-                                            <tr key={`${role.id}-${system.id}`} className="hover:bg-neutral-50">
-                                                <td className="p-3 font-medium text-neutral-900">{role.nome}</td>
-                                                <td className="p-3 text-neutral-500">
-                                                    {systemNameById.get(system.id) ?? system.id}
-                                                </td>
-                                                <td className="p-3 text-neutral-500">
-                                                    {usersList.join(", ") || "—"}
-                                                </td>
-                                                <td className="p-3 text-right">
-                                                    <div className="flex justify-end gap-1">
-                                                        <ActionTooltip label="Editar">
-                                                            <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleEditRole(role)}>
-                                                                <Pencil className="size-4" />
-                                                            </Button>
-                                                        </ActionTooltip>
-                                                        <ActionTooltip label="Usuários">
-                                                            <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleManageUsers(role)}>
-                                                                <Users className="size-4" />
-                                                            </Button>
-                                                        </ActionTooltip>
-                                                        <ActionTooltip label="Excluir">
-                                                            <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-red-600" onClick={() => confirmDelete(role)}>
-                                                                <Trash2 className="size-4" />
-                                                            </Button>
-                                                        </ActionTooltip>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                ) : (
-                                    <tr key={role.id} className="hover:bg-neutral-50">
-                                        <td className="p-3 font-medium text-neutral-900">{role.nome}</td>
-                                        <td className="p-3 text-neutral-500">—</td>
-                                        <td className="p-3 text-neutral-500">—</td>
-                                        <td className="p-3 text-right">
-                                            <div className="flex justify-end gap-1">
-                                                <ActionTooltip label="Editar">
-                                                    <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleEditRole(role)}>
-                                                        <Pencil className="size-4" />
-                                                    </Button>
-                                                </ActionTooltip>
-                                                <ActionTooltip label="Usuários">
-                                                    <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleManageUsers(role)}>
-                                                        <Users className="size-4" />
-                                                    </Button>
-                                                </ActionTooltip>
-                                                <ActionTooltip label="Excluir">
-                                                    <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-red-600" onClick={() => confirmDelete(role)}>
-                                                        <Trash2 className="size-4" />
-                                                    </Button>
-                                                </ActionTooltip>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )
+                                <tr key={role.id} className="hover:bg-neutral-50">
+                                    <td className="p-3 font-medium text-neutral-900">{role.nome}</td>
+                                    <td className="p-3 text-neutral-500">{role.descricao || "—"}</td>
+                                    <td className="p-3 text-right">
+                                        <div className="flex justify-end gap-1">
+                                            <ActionTooltip label="Editar">
+                                                <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-brand-600" onClick={() => handleEditRole(role)}>
+                                                    <Pencil className="size-4" />
+                                                </Button>
+                                            </ActionTooltip>
+                                            <ActionTooltip label="Excluir">
+                                                <Button variant="ghost" size="icon" className="size-8 text-neutral-500 hover:text-red-600" onClick={() => confirmDelete(role)}>
+                                                    <Trash2 className="size-4" />
+                                                </Button>
+                                            </ActionTooltip>
+                                        </div>
+                                    </td>
+                                </tr>
                             ))}
                             {filteredRoles.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="p-4 text-center text-neutral-500">Nenhum papel encontrado.</td>
+                                    <td colSpan={3} className="p-4 text-center text-neutral-500">Nenhum papel encontrado.</td>
                                 </tr>
                             )}
                         </tbody>
@@ -1170,6 +1122,14 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh }: any) {
                                     onChange={e => setFormData({ ...formData, nome: e.target.value })}
                                 />
                             </div>
+                            <div>
+                                <label className="text-sm font-medium">Descrição</label>
+                                <textarea
+                                    className="w-full rounded-md border p-2 text-sm"
+                                    value={formData.descricao || ""}
+                                    onChange={e => setFormData({ ...formData, descricao: e.target.value })}
+                                />
+                            </div>
                         </div>
                         <div className="mt-6 flex justify-end gap-2">
                             <Button variant="secondary" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
@@ -1180,19 +1140,6 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh }: any) {
                     </Dialog.Content>
                 </Dialog.Portal>
             </Dialog.Root>
-
-            {/* Role Users Dialog */}
-            {selectedRoleForUsers && (
-                <RoleUsersDialog
-                    role={selectedRoleForUsers}
-                    users={users}
-                    systems={systems}
-                    userRoles={userRoles}
-                    isOpen={isRoleUsersOpen}
-                    onClose={() => setIsRoleUsersOpen(false)}
-                    onRefresh={onRefresh}
-                />
-            )}
 
             {/* Delete Confirmation Dialog */}
             <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
@@ -1234,132 +1181,6 @@ function RolesTab({ roles, users, userRoles, systems, onRefresh }: any) {
                 </Dialog.Portal>
             </Dialog.Root>
         </>
-    );
-}
-
-// --- Role Users Dialog ---
-
-function RoleUsersDialog({ role, users, systems, userRoles, isOpen, onClose, onRefresh }: any) {
-    const { supabase } = useSupabase();
-    const [saving, setSaving] = useState(false);
-    const [selectedSystemId, setSelectedSystemId] = useState<string>(systems[0]?.id ?? "");
-
-    useEffect(() => {
-        if (!selectedSystemId && systems[0]?.id) {
-            setSelectedSystemId(systems[0].id);
-        }
-    }, [selectedSystemId, systems]);
-
-    const currentRoleUsers = userRoles.filter(
-        (ur: ZUserRole) => ur.papel_id === role.id && ur.sistema_id === selectedSystemId
-    );
-    const currentUserIds = new Set(currentRoleUsers.map((ur: ZUserRole) => ur.usuario_id));
-    const systemName = systems.find((sys: ZSystem) => sys.id === selectedSystemId)?.nome || "Selecione um sistema";
-
-    const handleToggleUser = async (userId: string, checked: boolean) => {
-        setSaving(true);
-        try {
-            if (!supabase) {
-                throw new Error(
-                    "Supabase não configurado. Informe NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
-                );
-            }
-            if (checked) {
-                const { error: insertError } = await supabase
-                    .from("z_usuarios_papeis")
-                    .insert({
-                        usuario_id: userId,
-                        papel_id: role.id,
-                        sistema_id: selectedSystemId
-                    });
-                if (insertError) {
-                    throw insertError;
-                }
-            } else {
-                const { error: deleteError } = await supabase
-                    .from("z_usuarios_papeis")
-                    .delete()
-                    .match({ usuario_id: userId, papel_id: role.id, sistema_id: selectedSystemId });
-                if (deleteError) {
-                    throw deleteError;
-                }
-            }
-            onRefresh();
-        } catch (err: any) {
-            console.error(err);
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const sortedUsers = [...users].sort((a: ZUser, b: ZUser) =>
-        (a.nome_completo || "").localeCompare(b.nome_completo || "")
-    );
-
-    return (
-        <Dialog.Root open={isOpen} onOpenChange={onClose}>
-            <Dialog.Portal>
-                <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
-                <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[80vh] w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
-                    <Dialog.Title className="mb-1 text-lg font-bold">
-                        Usuários do papel {role.nome}
-                    </Dialog.Title>
-                    <Dialog.Description className="mb-4 text-sm text-neutral-500">
-                        Gerencie os usuários vinculados ao papel no sistema {systemName}.
-                    </Dialog.Description>
-
-                    <div className="space-y-3">
-                        <div className="grid gap-2">
-                            <label className="text-xs font-semibold text-neutral-500">Sistema</label>
-                            <select
-                                className="w-full rounded-md border bg-white p-2 text-sm"
-                                value={selectedSystemId}
-                                onChange={(e) => setSelectedSystemId(e.target.value)}
-                            >
-                                <option value="" disabled>Selecione um sistema</option>
-                                {systems.map((sys: ZSystem) => (
-                                    <option key={sys.id} value={sys.id}>
-                                        {sys.nome}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {selectedSystemId ? (
-                            <>
-                                {sortedUsers.map((user: ZUser) => {
-                                    const isChecked = currentUserIds.has(user.id);
-                                    return (
-                                        <label key={user.id} className="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-neutral-100 px-3 py-2 text-sm hover:bg-neutral-50">
-                                            <div>
-                                                <div className="font-medium text-neutral-900">{user.nome_completo || "Sem nome"}</div>
-                                                <div className="text-neutral-500">{user.email}</div>
-                                            </div>
-                                            <input
-                                                type="checkbox"
-                                                checked={isChecked}
-                                                onChange={(e) => handleToggleUser(user.id, e.target.checked)}
-                                                disabled={saving}
-                                                className="rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
-                                            />
-                                        </label>
-                                    );
-                                })}
-                                {sortedUsers.length === 0 && (
-                                    <p className="text-center text-neutral-500">Nenhum usuário cadastrado.</p>
-                                )}
-                            </>
-                        ) : (
-                            <p className="text-sm text-neutral-500">Selecione um sistema para gerenciar os usuários.</p>
-                        )}
-                    </div>
-
-                    <div className="mt-6 flex justify-end">
-                        <Button onClick={onClose}>Fechar</Button>
-                    </div>
-                </Dialog.Content>
-            </Dialog.Portal>
-        </Dialog.Root>
     );
 }
 
