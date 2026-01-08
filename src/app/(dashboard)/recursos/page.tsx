@@ -13,11 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useSupabase } from "@/components/providers/supabase-provider";
-import { type Database, type TablesRow } from "@/lib/supabase/types";
+import { type Database, type Tables } from "@/lib/supabase/types";
 
-type ResourceRow = TablesRow<Database["public"]["Tables"]["C_RECURSOS_FORNECEDOR"]>;
-type SupplierRow = TablesRow<Database["public"]["Tables"]["C_FORNECEDORES"]>;
-type ProfileRow = TablesRow<Database["public"]["Tables"]["C_PERFIS_RECURSOS"]>;
+type ResourceRow = Tables<"C_RECURSOS_FORNECEDOR">;
+type SupplierRow = Tables<"C_FORNECEDORES">;
+type ProfileRow = Tables<"C_PERFIS_RECURSOS">;
 
 type ResourceRecord = ResourceRow & {
   fornecedor?: Pick<SupplierRow, "id" | "nome"> | null;
@@ -54,13 +54,13 @@ type ProfileFormErrors = Partial<Record<keyof ProfileFormState, string>> & {
 
 const RESOURCES_TABLE = (
   process.env.NEXT_PUBLIC_SUPABASE_RESOURCES_TABLE ?? "C_RECURSOS_FORNECEDOR"
-) as keyof Database["public"]["Tables"];
+) as "C_RECURSOS_FORNECEDOR";
 const SUPPLIERS_TABLE = (
   process.env.NEXT_PUBLIC_SUPABASE_SUPPLIERS_TABLE ?? "C_FORNECEDORES"
-) as keyof Database["public"]["Tables"];
+) as "C_FORNECEDORES";
 const PROFILES_TABLE = (
   process.env.NEXT_PUBLIC_SUPABASE_PROFILES_TABLE ?? "C_PERFIS_RECURSOS"
-) as keyof Database["public"]["Tables"];
+) as "C_PERFIS_RECURSOS";
 
 const EMPTY_FORM_STATE: ResourceFormState = {
   nome_completo: "",

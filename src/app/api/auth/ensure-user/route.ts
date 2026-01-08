@@ -3,9 +3,18 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { createHash, randomBytes } from "crypto";
 
+export const runtime = "nodejs";
+
 type Payload = {
   email?: string;
   password?: string;
+};
+
+type AuthUser = {
+  user: {
+    id: string;
+    email?: string | null;
+  };
 };
 
 const hashPasswordServer = (value: string) =>
@@ -88,11 +97,16 @@ export async function POST(request: Request) {
     }
 
     const admin = supabase.auth.admin;
-    let authUser: Awaited<ReturnType<typeof admin.getUserByEmail>>["data"] | null = null;
+    let authUser: AuthUser | null = null;
 
-    if (typeof admin.getUserByEmail === "function") {
-      const { data, error: authLookupError } =
-        await admin.getUserByEmail(normalizedEmail);
+    const getUserByEmail = (
+      admin as typeof admin & {
+        getUserByEmail?: (email: string) => Promise<{ data: AuthUser | null; error: unknown }>;
+      }
+    ).getUserByEmail;
+
+    if (typeof getUserByEmail === "function") {
+      const { data, error: authLookupError } = await getUserByEmail(normalizedEmail);
       if (authLookupError) {
         return NextResponse.json({ error: "Falha ao consultar autenticação." }, { status: 500 });
       }

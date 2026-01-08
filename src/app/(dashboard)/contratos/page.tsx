@@ -14,10 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useSupabase } from "@/components/providers/supabase-provider";
-import { type Database, type TablesRow } from "@/lib/supabase/types";
+import { type Tables } from "@/lib/supabase/types";
 
-type ContractRow = TablesRow<Database["public"]["Tables"]["C_CONTRATOS_CLIENTE"]>;
-type ClientRow = TablesRow<Database["public"]["Tables"]["C_CLIENTES"]>;
+type ContractRow = Tables<"C_CONTRATOS_CLIENTE">;
+type ClientRow = Tables<"C_CLIENTES">;
 
 type ContractRecord = ContractRow & {
   status?: string | null;

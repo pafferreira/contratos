@@ -27,15 +27,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useSupabase } from "@/components/providers/supabase-provider";
 
-import { type Database, type TablesRow } from "@/lib/supabase/types";
+import { type Database, type Tables } from "@/lib/supabase/types";
 
-type SupplierContractRow = TablesRow<Database["public"]["Tables"]["C_CONTRATOS_FORNECEDOR"]>;
+type SupplierContractRow = Tables<"C_CONTRATOS_FORNECEDOR">;
 
-type SupplierRow = TablesRow<Database["public"]["Tables"]["C_FORNECEDORES"]>;
+type SupplierRow = Tables<"C_FORNECEDORES">;
 
-type OSRow = TablesRow<Database["public"]["Tables"]["C_ORDENS_SERVICO"]>;
+type OSRow = Tables<"C_ORDENS_SERVICO">;
 
-type ProfileRow = TablesRow<Database["public"]["Tables"]["C_PERFIS_RECURSOS"]>;
+type ProfileRow = Tables<"C_PERFIS_RECURSOS">;
 
 type SupplierContractRecord = SupplierContractRow & {
 
@@ -93,28 +93,20 @@ type FormErrors = Partial<Record<keyof ContractFormState, string>> & {
 };
 
 const CONTRACTS_TABLE = (
-
   process.env.NEXT_PUBLIC_SUPABASE_SUPPLIER_CONTRACTS_TABLE ?? "C_CONTRATOS_FORNECEDOR"
-
-) as keyof Database["public"]["Tables"];
+) as "C_CONTRATOS_FORNECEDOR";
 
 const SUPPLIERS_TABLE = (
-
   process.env.NEXT_PUBLIC_SUPABASE_SUPPLIERS_TABLE ?? "C_FORNECEDORES"
-
-) as keyof Database["public"]["Tables"];
+) as "C_FORNECEDORES";
 
 const SERVICE_ORDERS_TABLE = (
-
   process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ORDERS_TABLE ?? "C_ORDENS_SERVICO"
-
-) as keyof Database["public"]["Tables"];
+) as "C_ORDENS_SERVICO";
 
 const PROFILES_TABLE = (
-
   process.env.NEXT_PUBLIC_SUPABASE_PROFILES_TABLE ?? "C_PERFIS_RECURSOS"
-
-) as keyof Database["public"]["Tables"];
+) as "C_PERFIS_RECURSOS";
 
 const OS_PROFILE_DELIMITER = "::profile::";
 

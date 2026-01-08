@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import type { Route } from "next";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -10,7 +10,7 @@ import { Lock } from "lucide-react";
 
 type ZUser = Database["public"]["Tables"]["z_usuarios"]["Row"];
 
-export default function SignInPage() {
+function SignInContent() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -179,5 +179,19 @@ export default function SignInPage() {
         ) : null}
       </div>
     </main>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-neutral-25 px-4">
+          <p className="text-sm text-neutral-500">Carregando...</p>
+        </main>
+      }
+    >
+      <SignInContent />
+    </Suspense>
   );
 }
