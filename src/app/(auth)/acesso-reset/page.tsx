@@ -11,6 +11,7 @@ import { Loader2, Lock, ShieldCheck } from "lucide-react";
 
 type ZUser = Database["public"]["Tables"]["z_usuarios"]["Row"];
 type ZUserUpdate = Database["public"]["Tables"]["z_usuarios"]["Update"];
+
 export default function AccessResetPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [loading, setLoading] = useState(true);
@@ -154,7 +155,7 @@ export default function AccessResetPage() {
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  className="w-full rounded-lg border border-neutral-200 bg-white py-2 pl-10 pr-3 text-sm text-neutral-800 outline-none hocus:border-brand-500"
+                  className="w-full rounded-lg border border-neutral-200 bg-white py-2 pl-10 pr-3 text-sm text-neutral-800 outline-none hover:border-brand-500 focus:border-brand-500"
                   placeholder="Digite a nova senha"
                 />
               </div>
@@ -170,7 +171,7 @@ export default function AccessResetPage() {
                   type="password"
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
-                  className="w-full rounded-lg border border-neutral-200 bg-white py-2 pl-10 pr-3 text-sm text-neutral-800 outline-none hocus:border-brand-500"
+                  className="w-full rounded-lg border border-neutral-200 bg-white py-2 pl-10 pr-3 text-sm text-neutral-800 outline-none hover:border-brand-500 focus:border-brand-500"
                   placeholder="Confirme a nova senha"
                 />
               </div>

@@ -107,7 +107,9 @@ export function AccessAdminClient() {
   const rolesByUser = useMemo(() => {
     const roleCount = new Map<string, number>();
     userRoles.forEach((role) => {
-      roleCount.set(role.usuario_id, (roleCount.get(role.usuario_id) ?? 0) + 1);
+      if (role.usuario_id) {
+        roleCount.set(role.usuario_id, (roleCount.get(role.usuario_id) ?? 0) + 1);
+      }
     });
     return roleCount;
   }, [userRoles]);
