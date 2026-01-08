@@ -284,7 +284,7 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh }: any) {
                             <List className="size-4" />
                         </Button>
                     </div>
-                    <Button onClick={() => { setEditingUser(null); setFormData({ ativo: true }); setIsDialogOpen(true); }}>
+                    <Button onClick={() => { setEditingUser(null); setFormData({ ativo: true, email: "", nome_completo: "" }); setIsDialogOpen(true); }}>
                         <Plus className="mr-2 size-4" />
                         Novo Usuário
                     </Button>
@@ -476,15 +476,15 @@ function UsersTab({ users, systems, roles, userRoles, onRefresh }: any) {
 
             {/* Roles Management Dialog */}
             {selectedUserForRoles && (
-                    <UserRolesDialog
-                        user={selectedUserForRoles}
-                        isOpen={isRolesDialogOpen}
-                        onClose={() => setIsRolesDialogOpen(false)}
-                        systems={systems}
-                        roles={roles}
-                        userRoles={userRoles}
-                        onRefresh={onRefresh}
-                    />
+                <UserRolesDialog
+                    user={selectedUserForRoles}
+                    isOpen={isRolesDialogOpen}
+                    onClose={() => setIsRolesDialogOpen(false)}
+                    systems={systems}
+                    roles={roles}
+                    userRoles={userRoles}
+                    onRefresh={onRefresh}
+                />
             )}
         </>
     );
@@ -896,7 +896,7 @@ function RolesTab({ roles, onRefresh }: any) {
     const [viewMode, setViewMode] = useState<"cards" | "list">("list");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingRole, setEditingRole] = useState<ZRole | null>(null);
-    const [formData, setFormData] = useState<Partial<ZRole>>({ nome: "", descricao: "", sistema_id: "" });
+    const [formData, setFormData] = useState<Partial<ZRole>>({ nome: "", descricao: "" });
     const [saving, setSaving] = useState(false);
 
     const [deleteOpen, setDeleteOpen] = useState(false);

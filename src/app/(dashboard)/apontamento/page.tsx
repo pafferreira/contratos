@@ -28,11 +28,11 @@ import {
 } from "@/components/ui/tooltip";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useSupabase } from "@/components/providers/supabase-provider";
-import { type Database, type TablesRow } from "@/lib/supabase/types";
+import { type Database } from "@/lib/supabase/types";
 
-type ResourceRow = TablesRow<Database["public"]["Tables"]["C_RECURSOS_FORNECEDOR"]>;
-type SupplierRow = TablesRow<Database["public"]["Tables"]["C_FORNECEDORES"]>;
-type AllocationRow = TablesRow<Database["public"]["Tables"]["C_ALOCACOES_RECURSOS"]> & {
+type ResourceRow = Database["public"]["Tables"]["C_RECURSOS_FORNECEDOR"]["Row"];
+type SupplierRow = Database["public"]["Tables"]["C_FORNECEDORES"]["Row"];
+type AllocationRow = Database["public"]["Tables"]["C_ALOCACOES_RECURSOS"]["Row"] & {
     solicitacao?: { titulo: string | null; codigo_rs: string | null } | { titulo: string | null; codigo_rs: string | null }[] | null;
     ordem_servico?: {
         numero_os: string | null;
