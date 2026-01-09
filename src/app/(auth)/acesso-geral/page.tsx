@@ -15,42 +15,13 @@ function AccessGeneralContent() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = (searchParams.get("redirect") ?? "/acesso-geral") as Route;
+  const redirectTo = (searchParams.get("redirect") ?? "/dashboard") as Route;
 
-  const [users, setUsers] = useState<ZUser[]>([]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loadingUsers, setLoadingUsers] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    const loadUsers = async () => {
-      setLoadingUsers(true);
-      const response = await fetch("/api/auth/users", { cache: "no-store" });
-      const payload = await response.json().catch(() => ({}));
-      if (!isMounted) return;
-      if (!response.ok) {
-        console.error("Erro ao carregar usuários:", payload?.error);
-        setMessage(payload?.error || "Não foi possível carregar os usuários.");
-        setLoadingUsers(false);
-        return;
-      }
-      setUsers(payload?.users ?? []);
-      setLoadingUsers(false);
-    };
-
-    loadUsers();
-    return () => {
-      isMounted = false;
-    };
-  }, [supabase]);
-
-  const selectedUser = useMemo(() => {
-    if (!email) return null;
-    return users.find((user) => user.email.toLowerCase() === email.trim().toLowerCase()) ?? null;
-  }, [email, users]);
+  const [resetting, setResetting] = useState(false);
 
   const handleSignIn = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -111,6 +82,35 @@ function AccessGeneralContent() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    setMessage(null);
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      setMessage("Digite seu e-mail acima para solicitar a recuperação.");
+      return;
+    }
+
+    if (!supabase) return;
+
+    setResetting(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo: `${window.location.origin}/acesso-reset`,
+      });
+
+      if (error) {
+        setMessage("Erro ao enviar e-mail de recuperação.");
+      } else {
+        setMessage("E-mail de recuperação enviado! Verifique sua caixa de entrada.");
+      }
+    } catch (err) {
+      setMessage("Erro inesperado ao solicitar recuperação.");
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-neutral-25 px-4">
       <div className="pointer-events-none absolute inset-0">
@@ -140,36 +140,32 @@ function AccessGeneralContent() {
           <form className="space-y-4" onSubmit={handleSignIn}>
             <div className="space-y-2">
               <label className="text-sm font-medium text-neutral-700" htmlFor="user">
-                Usuário
+                E-mail
               </label>
               <input
                 id="user"
-                list="users"
+                type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-800 shadow-sm outline-none hocus:border-brand-500"
-                placeholder={loadingUsers ? "Carregando usuários..." : "Selecione pelo e-mail"}
-                disabled={loadingUsers}
+                placeholder="Digite seu e-mail"
                 required
               />
-              <datalist id="users">
-                {users.map((user) => (
-                  <option
-                    key={user.id}
-                    value={user.email}
-                  >{`${user.nome_completo ?? "Usuário"} (${user.email})`}</option>
-                ))}
-              </datalist>
-              {selectedUser ? (
-                <p className="text-xs text-neutral-500">
-                  {selectedUser.nome_completo ?? selectedUser.email}
-                </p>
-              ) : null}
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-neutral-700" htmlFor="password">
-                Senha
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-neutral-700" htmlFor="password">
+                  Senha
+                </label>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={resetting}
+                  className="text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50"
+                >
+                  {resetting ? "Enviando..." : "Esqueci minha senha"}
+                </button>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
                 <input
@@ -184,7 +180,7 @@ function AccessGeneralContent() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={submitting || loadingUsers}>
+            <Button type="submit" className="w-full" disabled={submitting}>
               {submitting ? "Entrando..." : "Entrar"}
             </Button>
           </form>

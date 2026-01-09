@@ -13,8 +13,10 @@ import {
   Eye,
   EyeOff,
   KeyRound,
+  Link,
   Loader2,
   Lock,
+  Monitor,
   Pencil,
   Plus,
   Search,
@@ -328,7 +330,7 @@ export function AccessAdminClient() {
         </Card>
         <Card className="flex items-center gap-4 p-4">
           <div className="rounded-xl bg-neutral-100 p-3 text-neutral-600">
-            <Lock className="size-5" />
+            <KeyRound className="size-5" />
           </div>
           <div>
             <p className="text-xs uppercase text-neutral-400">Com senha</p>
@@ -337,7 +339,7 @@ export function AccessAdminClient() {
         </Card>
         <Card className="flex items-center gap-4 p-4">
           <div className="rounded-xl bg-brand-50 p-3 text-brand-600">
-            <Lock className="size-5" />
+            <Link className="size-5" />
           </div>
           <div>
             <p className="text-xs uppercase text-neutral-400">Vínculos</p>
@@ -346,7 +348,7 @@ export function AccessAdminClient() {
         </Card>
         <Card className="flex items-center gap-4 p-4">
           <div className="rounded-xl bg-neutral-100 p-3 text-neutral-600">
-            <Lock className="size-5" />
+            <Monitor className="size-5" />
           </div>
           <div>
             <p className="text-xs uppercase text-neutral-400">Sistemas ativos</p>
