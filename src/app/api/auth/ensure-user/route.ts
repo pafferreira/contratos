@@ -36,17 +36,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Credenciais inválidas." }, { status: 400 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
-    const serviceRoleKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
-      const missing = [
-        !supabaseUrl ? "SUPABASE_URL" : null,
-        !serviceRoleKey ? "SUPABASE_SERVICE_ROLE_KEY" : null
-      ].filter(Boolean);
+      console.error("Configuração ausente: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY");
       return NextResponse.json(
-        { error: `Supabase não configurado (${missing.join(", ")}).` },
+        { error: "Erro de configuração no servidor." },
         { status: 500 }
       );
     }
@@ -60,15 +56,19 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (userError) {
-      return NextResponse.json({ error: "Falha ao buscar usuário." }, { status: 500 });
+      console.error("Erro ao buscar usuário no banco:", userError);
+      return NextResponse.json(
+        { error: "Ocorreu um erro ao processar sua solicitação." },
+        { status: 500 }
+      );
     }
 
-    if (!userRecord) {
-      return NextResponse.json({ error: "Usuário não encontrado." }, { status: 401 });
-    }
+    // Mensagem genérica para evitar enumeração de usuários
+    const invalidCredentialsResponse = () =>
+      NextResponse.json({ error: "E-mail ou senha inválidos." }, { status: 401 });
 
-    if (!userRecord.ativo) {
-      return NextResponse.json({ error: "Usuário inativo." }, { status: 403 });
+    if (!userRecord || !userRecord.ativo) {
+      return invalidCredentialsResponse();
     }
 
     let tempPassword: string | null = null;
@@ -80,11 +80,11 @@ export async function POST(request: Request) {
         .update({ senha_hash: hashPasswordServer(tempPassword) })
         .eq("id", userRecord.id);
       if (updateError) {
-        return NextResponse.json({ error: "Falha ao gerar senha." }, { status: 500 });
+        return NextResponse.json({ error: "Falha ao processar credenciais." }, { status: 500 });
       }
     } else {
       if (!password) {
-        return NextResponse.json({ error: "Senha inválida." }, { status: 401 });
+        return invalidCredentialsResponse();
       }
 
       const hashed = hashPasswordServer(password);
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
         userRecord.senha_hash === hashed || userRecord.senha_hash === password;
 
       if (!passwordMatches) {
-        return NextResponse.json({ error: "Senha inválida." }, { status: 401 });
+        return invalidCredentialsResponse();
       }
     }
 
@@ -153,7 +153,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, tempPassword });
   } catch (err) {
-    console.error("Erro ao validar usuário:", err);
+    console.error("Erro crítico na API ensure-user:", err);
     const message = err instanceof Error ? err.message : "Erro inesperado.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
