@@ -136,19 +136,10 @@ function SignInContent() {
             />
           </div>
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-neutral-600" htmlFor="password">
-                Senha
-              </label>
-              <button
-                type="button"
-                onClick={handleForgotPassword}
-                disabled={resetting}
-                className="text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50"
-              >
-                {resetting ? "Enviando..." : "Esqueci minha senha"}
-              </button>
-            </div>
+            <label className="text-sm font-medium text-neutral-600" htmlFor="password">
+              Senha
+            </label>
+
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
               <input
@@ -166,6 +157,20 @@ function SignInContent() {
           <Button type="submit" className="w-full" disabled={submitting}>
             {submitting ? "Entrando..." : "Entrar"}
           </Button>
+
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-[10px] font-medium text-neutral-400">
+              v1.3.6
+            </span>
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={resetting}
+              className="text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50"
+            >
+              {resetting ? "Enviando..." : "Esqueci minha senha"}
+            </button>
+          </div>
         </form>
 
         {message ? (
