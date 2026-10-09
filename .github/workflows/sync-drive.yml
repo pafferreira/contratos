@@ -1,0 +1,76 @@
+# .github/workflows/sync-drive.yml
+# Espelha o repositório (branch main) em Meu Drive > PAF > DEV > contratos.
+# Mão única: GitHub -> Drive. Não edite arquivos direto no Drive,
+# eles serão sobrescritos no próximo push.
+#
+# Pré-requisitos (Settings > Secrets and variables > Actions):
+#   Secret   RCLONE_CONFIG     -> conteúdo completo do rclone.conf com um remote chamado "gdrive"
+#   Variable DRIVE_ROOT_FOLDER -> (opcional) pasta raiz no Drive. Padrão: PAF/DEV
+#   Variable DRIVE_REPO_FOLDER -> (opcional) pasta do projeto. Padrão: contratos
+
+name: Sync Google Drive
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # permite rodar manualmente pela aba Actions (inclusive no app do GitHub)
+
+concurrency:
+  group: sync-drive
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DRIVE_ROOT: ${{ vars.DRIVE_ROOT_FOLDER || 'PAF/DEV' }}
+      REPO_NAME: ${{ vars.DRIVE_REPO_FOLDER || 'contratos' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Instalar rclone
+        run: curl -fsSL https://rclone.org/install.sh | sudo bash
+
+      - name: Configurar rclone
+        env:
+          RCLONE_CONFIG_CONTENT: ${{ secrets.RCLONE_CONFIG }}
+        run: |
+          if [ -z "$RCLONE_CONFIG_CONTENT" ]; then
+            echo "::error::Secret RCLONE_CONFIG não configurado."
+            exit 1
+          fi
+          mkdir -p ~/.config/rclone
+          printf '%s\n' "$RCLONE_CONFIG_CONTENT" > ~/.config/rclone/rclone.conf
+          chmod 600 ~/.config/rclone/rclone.conf
+
+      - name: Espelhar no Google Drive
+        run: |
+          rclone sync . "gdrive:${DRIVE_ROOT}/${REPO_NAME}" \
+            --exclude ".git/**" \
+            --exclude "node_modules/**" \
+            --exclude ".next/**" \
+            --exclude "dist/**" \
+            --exclude "build/**" \
+            --exclude ".vercel/**" \
+            --exclude ".turbo/**" \
+            --exclude "coverage/**" \
+            --exclude ".env" \
+            --exclude ".env.*" \
+            --exclude "*.pem" \
+            --exclude "*.key" \
+            --drive-use-trash=true \
+            --fast-list \
+            --transfers 8 \
+            --stats-one-line -v
+
+      - name: Registrar versão sincronizada
+        run: |
+          printf 'commit: %s\nbranch: %s\ndata: %s\n' \
+            "$GITHUB_SHA" "$GITHUB_REF_NAME" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > SYNC_INFO.txt
+          rclone copyto SYNC_INFO.txt "gdrive:${DRIVE_ROOT}/${REPO_NAME}/SYNC_INFO.txt"
